@@ -103,10 +103,10 @@
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center sm:p-4 select-none bg-m3-bg sm:bg-[#E7ECF4] dark:bg-m3-darkBg dark:sm:bg-[#0B0C0E] text-m3-onSurface dark:text-m3-darkOnSurface">
+<body class="min-h-[100dvh] flex flex-col items-center justify-center sm:p-4 select-none bg-m3-bg sm:bg-[#E7ECF4] dark:bg-m3-darkBg dark:sm:bg-[#0B0C0E] text-m3-onSurface dark:text-m3-darkOnSurface">
 
   <!-- Android Material You Mobile App Container (Full-bleed on small mobile, 430px device frame on larger screens) -->
-  <div id="app-shell" class="w-full max-w-[430px] min-h-screen sm:min-h-[800px] sm:h-[852px] sm:max-h-[96vh] bg-m3-bg dark:bg-m3-darkBg sm:border sm:border-m3-outline dark:sm:border-m3-darkOutline sm:rounded-[32px] sm:shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-200">
+  <div id="app-shell" class="w-full max-w-[430px] h-[100dvh] sm:min-h-[800px] sm:h-[852px] sm:max-h-[96vh] bg-m3-bg dark:bg-m3-darkBg sm:border sm:border-m3-outline dark:sm:border-m3-darkOutline sm:rounded-[32px] sm:shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-200">
 
     <!-- Material 3 Top App Bar -->
     <header class="px-5 pt-4 pb-3.5 bg-m3-bg/95 dark:bg-m3-darkBg/95 backdrop-blur-md z-10 border-b border-m3-outline/80 dark:border-m3-darkOutline/80">
@@ -366,7 +366,7 @@
     </main>
 
     <!-- Bottom-Anchored Material 3 Extended Floating Action Button (Extended FAB) -->
-    <div class="pointer-events-none absolute inset-x-0 bottom-12 px-4 pt-6 pb-2 flex justify-center bg-gradient-to-t from-m3-bg via-m3-bg/90 to-transparent dark:from-m3-darkBg dark:via-m3-darkBg/90">
+    <div class="pointer-events-none fixed sm:absolute inset-x-0 bottom-8 z-30 px-4 pt-6 pb-2 flex justify-center bg-gradient-to-t from-m3-bg via-m3-bg/90 to-transparent dark:from-m3-darkBg dark:via-m3-darkBg/90">
       <button
         id="btn-mic-toggle"
         type="button"
