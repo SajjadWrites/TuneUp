@@ -188,7 +188,7 @@
     </div>
 
     <!-- Scrollable Workspace -->
-    <main class="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 pb-24 space-y-4">
+    <main class="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 pb-32 space-y-4">
 
       <!-- ========================================================= -->
       <!-- VIEW 1: STRING TUNER (EADGBE + Auto Detect, NO Simulator) -->
@@ -301,9 +301,9 @@
             <div>
               <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Detected Chord</span>
               <div class="flex flex-wrap items-center gap-2.5 mt-1">
-                <span id="chord-name-display" class="text-[36px] leading-none font-bold tracking-tight text-m3-onSurface dark:text-m3-darkOnSurface">Listening...</span>
+                <span id="chord-name-display" class="text-[36px] leading-none font-bold tracking-tight text-m3-onSurface dark:text-m3-darkOnSurface">Ready</span>
                 <span id="chord-quality-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer">
-                  Ready
+                  Standby
                 </span>
               </div>
             </div>
@@ -366,7 +366,7 @@
     </main>
 
     <!-- Bottom-Anchored Material 3 Extended Floating Action Button (Extended FAB) -->
-    <div class="pointer-events-none absolute inset-x-0 bottom-0 p-4 flex justify-center bg-gradient-to-t from-m3-bg via-m3-bg/90 to-transparent dark:from-m3-darkBg dark:via-m3-darkBg/90">
+    <div class="pointer-events-none absolute inset-x-0 bottom-12 px-4 pt-6 pb-2 flex justify-center bg-gradient-to-t from-m3-bg via-m3-bg/90 to-transparent dark:from-m3-darkBg dark:via-m3-darkBg/90">
       <button
         id="btn-mic-toggle"
         type="button"
@@ -1212,11 +1212,13 @@
     });
   </script>
   <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js');
-    });
-  }
-</script>
+    if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+          console.warn('Service worker registration skipped:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
