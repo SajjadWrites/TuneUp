@@ -191,7 +191,7 @@
     <main class="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 pb-32 space-y-4">
 
       <!-- ========================================================= -->
-      <!-- VIEW 1: STRING TUNER (EADGBE + Auto Detect, NO Simulator) -->
+      <!-- VIEW 1: STRING TUNER & CHROMATIC NOTE IDENTIFIER          -->
       <!-- ========================================================= -->
       <section id="view-tuner" class="space-y-4">
 
@@ -286,6 +286,31 @@
           <!-- 6 Standard EADGBE String Filter Chips -->
           <div id="string-buttons-grid" class="grid grid-cols-3 gap-2">
             <!-- Populated cleanly via JS -->
+          </div>
+        </div>
+
+        <!-- Material 3 Live Chromatic Note Identifier Card (Fixed width/height) -->
+        <div class="w-full h-[108px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation px-5 py-4 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Note Identifier</span>
+              <span id="note-id-status" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">
+                Chromatic
+              </span>
+            </div>
+            <p id="note-id-subtitle" class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-1.5">
+              Play any fret or note to identify pitch
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2.5 shrink-0">
+            <div class="text-right">
+              <div id="note-id-cents" class="text-xs font-mono font-semibold tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">--</div>
+              <div id="note-id-freq" class="text-[10px] font-mono tabular-nums text-m3-onSurfaceVariant/80 dark:text-m3-darkOnSurfaceVariant/80 mt-0.5">-- Hz</div>
+            </div>
+            <div id="note-id-badge" class="w-16 h-14 rounded-2xl bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex items-center justify-center text-2xl font-bold tracking-tight font-mono">
+              --
+            </div>
           </div>
         </div>
       </section>
@@ -506,6 +531,7 @@
         analyser: null,
         micStream: null,
         rafId: null,
+        wakeLock: null,
       };
 
       // =======================================================================
@@ -530,7 +556,7 @@
         feedbackBanner: document.getElementById('feedback-banner'),
         feedbackText: document.getElementById('feedback-text'),
         feedbackClose: document.getElementById('feedback-close'),
-        // Tuner view
+        // Tuner & Note Identifier view
         btnAutoLock: document.getElementById('btn-auto-lock'),
         autoLockCheck: document.getElementById('auto-lock-check'),
         tunerModeDesc: document.getElementById('tuner-mode-desc'),
@@ -542,7 +568,12 @@
         tunerNeedle: document.getElementById('tuner-needle'),
         tunerVerdictPill: document.getElementById('tuner-verdict-pill'),
         stringButtonsGrid: document.getElementById('string-buttons-grid'),
-        // Chord detector view
+        noteIdStatus: document.getElementById('note-id-status'),
+        noteIdSubtitle: document.getElementById('note-id-subtitle'),
+        noteIdCents: document.getElementById('note-id-cents'),
+        noteIdFreq: document.getElementById('note-id-freq'),
+        noteIdBadge: document.getElementById('note-id-badge'),
+        // Chord detector & Chord Family view
         chordResultCard: document.getElementById('chord-result-card'),
         chordNameDisplay: document.getElementById('chord-name-display'),
         chordQualityBadge: document.getElementById('chord-quality-badge'),
@@ -598,7 +629,37 @@
       }
 
       // =======================================================================
-      // 5. WEB AUDIO SYNTHESIS (Reference String Tone & Chord Preset Audio)
+      // 4B. SCREEN WAKE LOCK (Keep phone screen awake while app is open)
+      // =======================================================================
+      async function requestScreenWakeLock() {
+        if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') {
+          return;
+        }
+        try {
+          if (state.wakeLock && !state.wakeLock.released) return;
+          state.wakeLock = await navigator.wakeLock.request('screen');
+          state.wakeLock.addEventListener('release', () => {
+            state.wakeLock = null;
+          });
+        } catch (err) {
+          // Browsers may defer wake lock until a user gesture occurs
+        }
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          requestScreenWakeLock();
+        }
+      });
+
+      document.addEventListener('pointerdown', () => {
+        if (!state.wakeLock) {
+          requestScreenWakeLock();
+        }
+      }, { passive: true });
+
+      // =======================================================================
+      // 5. WEB AUDIO SYNTHESIS (Reference String Tone & Chord Audio)
       // =======================================================================
       function ensureAudioContext() {
         if (!state.audioCtx) {
@@ -653,6 +714,21 @@
         }
       }
 
+      function buildChordFrequencies(rootIndex, intervals) {
+        const baseMidi = 48 + rootIndex; // Octave 3 (C3 = 48)
+        const freqs = [];
+        intervals.forEach((iv) => {
+          const midi = baseMidi + iv;
+          freqs.push(440 * Math.pow(2, (midi - 69) / 12));
+        });
+        // Add upper octave root & fifth for fuller guitar voicing
+        freqs.push(440 * Math.pow(2, (baseMidi + 12 - 69) / 12));
+        if (intervals.includes(7)) {
+          freqs.push(440 * Math.pow(2, (baseMidi + 19 - 69) / 12));
+        }
+        return freqs;
+      }
+
       function playStrummedChord(freqs) {
         freqs.forEach((f, idx) => {
           playGuitarReferenceNote(f, 1.35, idx * 0.035);
@@ -660,7 +736,7 @@
       }
 
       // =======================================================================
-      // 6. TUNER DSP (Autocorrelation Pitch Detection) & UI RENDERING
+      // 6. TUNER & CHROMATIC NOTE IDENTIFIER DSP & UI RENDERING
       // =======================================================================
       function detectPitchAutocorrelation(buffer, sampleRate) {
         const SIZE = buffer.length;
@@ -670,7 +746,6 @@
           rms += val * val;
         }
         rms = Math.sqrt(rms / SIZE);
-        // Elevated noise gate threshold to ignore subtle ambient room noise
         if (rms < 0.02) return null;
 
         let r1 = 0;
@@ -702,6 +777,8 @@
           c[i] = sum;
         }
 
+        if (c[0] <= 0) return null;
+
         let d = 0;
         while (d < newSize - 1 && c[d] > c[d + 1]) {
           d++;
@@ -716,8 +793,7 @@
           }
         }
 
-        // Require strong periodicity correlation (c[maxPos] / c[0] >= 0.45) to reject non-musical noise
-        if (maxPos <= 0 || c[0] <= 0 || (maxVal / c[0]) < 0.45) return null;
+        if (maxPos <= 0 || maxVal / c[0] < 0.45) return null;
 
         let T0 = maxPos;
         if (T0 > 0 && T0 < newSize - 1) {
@@ -754,47 +830,100 @@
         return Math.max(-50, Math.min(50, raw));
       }
 
-      function updateTunerDisplay(detectedFreq, immediate = false) {
-        const now = performance.now();
-        let activeFreq = detectedFreq;
+      function frequencyToChromaticNote(freq) {
+        const midiExact = 69 + 12 * Math.log2(freq / 440);
+        const midiRounded = Math.round(midiExact);
+        const noteIndex = ((midiRounded % 12) + 12) % 12;
+        const octave = Math.floor(midiRounded / 12) - 1;
+        const noteName = NOTE_NAMES[noteIndex];
+        const exactFreq = 440 * Math.pow(2, (midiRounded - 69) / 12);
+        const cents = Math.round((midiExact - midiRounded) * 100);
+        return {
+          fullName: `${noteName}${octave}`,
+          noteName,
+          octave,
+          exactFreq,
+          cents,
+        };
+      }
 
-        if (!immediate && state.micActive) {
-          if (detectedFreq) {
-            // Require 3 consecutive stable frames (~50ms) before locking onto a new pitch
-            if (state.lastPitchString && Math.abs(1200 * Math.log2(detectedFreq / state.lastPitchString)) < 45) {
+      function updateNoteIdentifier(freq) {
+        if (!freq) {
+          els.noteIdBadge.textContent = '--';
+          els.noteIdBadge.className = 'w-16 h-14 rounded-2xl bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex items-center justify-center text-2xl font-bold tracking-tight font-mono';
+          els.noteIdCents.textContent = '--';
+          els.noteIdFreq.textContent = '-- Hz';
+          els.noteIdStatus.textContent = state.micActive ? 'Listening' : 'Chromatic';
+          els.noteIdStatus.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant';
+          els.noteIdSubtitle.textContent = state.micActive
+            ? 'Pluck any single string or fret'
+            : 'Play any fret or note to identify pitch';
+          return;
+        }
+
+        const info = frequencyToChromaticNote(freq);
+        const isExact = Math.abs(info.cents) <= 6;
+        const centsStr = `${info.cents > 0 ? '+' : ''}${info.cents}c`;
+
+        els.noteIdBadge.textContent = info.fullName;
+        els.noteIdCents.textContent = centsStr;
+        els.noteIdFreq.textContent = `${freq.toFixed(1)} Hz`;
+        els.noteIdSubtitle.textContent = `Concert pitch ${info.fullName} · ${info.exactFreq.toFixed(2)} Hz`;
+
+        if (isExact) {
+          els.noteIdBadge.className = 'w-16 h-14 rounded-2xl bg-[#CEEAD6] dark:bg-[#188038]/30 text-[#0D652D] dark:text-[#81C995] flex items-center justify-center text-2xl font-bold tracking-tight font-mono';
+          els.noteIdStatus.textContent = 'Exact';
+          els.noteIdStatus.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]';
+        } else {
+          els.noteIdBadge.className = 'w-16 h-14 rounded-2xl bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex items-center justify-center text-2xl font-bold tracking-tight font-mono';
+          els.noteIdStatus.textContent = info.cents < 0 ? 'Slightly Flat' : 'Slightly Sharp';
+          els.noteIdStatus.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
+        }
+      }
+
+      function updateTunerDisplay(rawFreq, immediate = false) {
+        const now = performance.now();
+        let activeFreq = rawFreq;
+
+        if (!immediate) {
+          if (rawFreq) {
+            const candidateStr = findNearestGuitarString(rawFreq);
+            if (state.lastPitchString === candidateStr.label) {
               state.pitchConfirmCount++;
             } else {
+              state.lastPitchString = candidateStr.label;
               state.pitchConfirmCount = 1;
             }
-            state.lastPitchString = detectedFreq;
 
-            if (state.pitchConfirmCount >= 3) {
-              // Exponential moving average smoothing for steady needle movement
-              state.smoothedFreq = state.smoothedFreq
-                ? state.smoothedFreq * 0.65 + detectedFreq * 0.35
-                : detectedFreq;
-              state.lastValidPitchTime = now;
+            if (state.pitchConfirmCount < 3 && state.smoothedFreq) {
               activeFreq = state.smoothedFreq;
             } else {
-              activeFreq = (now - state.lastValidPitchTime < 450) ? state.smoothedFreq : null;
+              if (state.smoothedFreq && Math.abs(1200 * Math.log2(rawFreq / state.smoothedFreq)) < 90) {
+                state.smoothedFreq = state.smoothedFreq * 0.65 + rawFreq * 0.35;
+              } else {
+                state.smoothedFreq = rawFreq;
+              }
+              state.lastValidPitchTime = now;
+              activeFreq = state.smoothedFreq;
             }
           } else {
             state.pitchConfirmCount = 0;
-            // Hold last valid pitch for 450ms as note rings out so display doesn't flicker
             if (state.smoothedFreq && (now - state.lastValidPitchTime) < 450) {
               activeFreq = state.smoothedFreq;
             } else {
               state.smoothedFreq = null;
+              state.lastPitchString = null;
               activeFreq = null;
             }
           }
-        } else if (immediate) {
-          state.smoothedFreq = detectedFreq;
+        } else if (!rawFreq) {
+          state.smoothedFreq = null;
+          state.lastPitchString = null;
           state.pitchConfirmCount = 0;
-          state.lastValidPitchTime = 0;
         }
 
         state.currentDetectedFreq = activeFreq;
+        updateNoteIdentifier(activeFreq);
 
         if (activeFreq && state.autoStringLock) {
           const nearest = findNearestGuitarString(activeFreq);
@@ -820,11 +949,9 @@
         const roundedCents = Math.round(cents);
         els.tunerCentsReadout.textContent = `${roundedCents > 0 ? '+' : ''}${roundedCents}c`;
 
-        // Needle horizontal travel inside linear meter (-112px to +112px)
         const offsetPx = (cents / 50) * 112;
         els.tunerNeedle.style.transform = `translateX(-50%) translateX(${offsetPx.toFixed(1)}px)`;
 
-        // Reset semantic card ring
         els.tunerGaugeCard.classList.remove(
           'border-[#188038]', 'dark:border-[#81C995]',
           'ring-2', 'ring-[#188038]/20', 'dark:ring-[#81C995]/20'
@@ -876,6 +1003,7 @@
             renderStringChips();
             playGuitarReferenceNote(str.freq, 1.0);
             updateTunerDisplay(null, true);
+            updateNoteIdentifier(str.freq);
           });
 
           els.stringButtonsGrid.appendChild(btn);
@@ -895,7 +1023,7 @@
       }
 
       // =======================================================================
-      // 7. POLYPHONIC CHORD DETECTOR DSP & UI RENDERING
+      // 7. POLYPHONIC CHORD DETECTOR & DIATONIC CHORD FAMILY ENGINE
       // =======================================================================
       function computeChromaFromFFT(freqData, sampleRate, fftSize) {
         const chroma = new Array(12).fill(0);
@@ -906,22 +1034,18 @@
         let totalEnergy = 0;
         for (let bin = minBin; bin <= maxBin; bin++) {
           const db = freqData[bin];
-          // Noise gate: ignore quiet room floor below -68 dB
           if (db < -68) continue;
 
-          // Linear amplitude with slight fundamental emphasis
-          const amp = Math.pow(10, (db + 72) / 34);
+          const amp = Math.pow(10, (db + 80) / 36);
           const freq = bin * binWidth;
           const midi = 69 + 12 * Math.log2(freq / 440);
           const pitchClass = ((Math.round(midi) % 12) + 12) % 12;
 
-          // Weight lower guitar register slightly higher to suppress upper overtone confusion
           const registerWeight = freq < 360 ? 1.25 : 0.85;
           chroma[pitchClass] += amp * registerWeight;
           totalEnergy += amp * registerWeight;
         }
 
-        // Require meaningful acoustic energy before classifying chords
         if (totalEnergy < 26) {
           return new Array(12).fill(0);
         }
@@ -933,14 +1057,13 @@
 
       function recognizeChordFromChroma(chroma) {
         const maxEnergy = Math.max(...chroma);
-        if (maxEnergy < 0.25) {
+        if (maxEnergy < 0.30) {
           return null;
         }
 
-        // Extract salient pitch classes
         const activeIndices = [];
         chroma.forEach((val, idx) => {
-          if (val >= 0.36) activeIndices.push(idx);
+          if (val >= 0.38) activeIndices.push(idx);
         });
 
         if (activeIndices.length < 2) {
@@ -951,7 +1074,7 @@
         let bestScore = -Infinity;
 
         for (let root = 0; root < 12; root++) {
-          if (chroma[root] < 0.32) continue;
+          if (chroma[root] < 0.36) continue;
 
           for (const tmpl of CHORD_TEMPLATES) {
             let inChordScore = 0;
@@ -961,16 +1084,15 @@
               const pc = (root + interval) % 12;
               const weight = interval === 0 ? 1.45 : interval === 7 ? 1.05 : 1.2;
               inChordScore += chroma[pc] * weight;
-              if (chroma[pc] >= 0.32) matchedCount++;
+              if (chroma[pc] >= 0.36) matchedCount++;
             }
 
             if (matchedCount < Math.min(3, tmpl.intervals.length)) continue;
 
-            // Penalize strong non-chord tones
             let outChordPenalty = 0;
             for (let pc = 0; pc < 12; pc++) {
               const relInterval = (pc - root + 12) % 12;
-              if (!tmpl.intervals.includes(relInterval) && chroma[pc] > 0.34) {
+              if (!tmpl.intervals.includes(relInterval) && chroma[pc] > 0.36) {
                 outChordPenalty += chroma[pc] * 0.9;
               }
             }
@@ -979,7 +1101,10 @@
             if (normalizedScore > bestScore) {
               bestScore = normalizedScore;
               bestMatch = {
+                rootIndex: root,
                 rootName: NOTE_NAMES[root],
+                suffix: tmpl.suffix,
+                symbol: `${NOTE_NAMES[root]}${tmpl.suffix}`,
                 displayName: `${NOTE_NAMES[root]}${tmpl.displaySuffix}`,
                 quality: tmpl.quality,
                 intervals: tmpl.intervals,
@@ -990,11 +1115,111 @@
           }
         }
 
-        if (!bestMatch || bestScore < 0.44) {
+        if (!bestMatch || bestScore < 0.48) {
           return null;
         }
 
         return bestMatch;
+      }
+
+      function computeChordFamily(rootIndex, suffix) {
+        const isMinorContext = suffix === 'm' || suffix === 'm7';
+        const scaleSteps = isMinorContext ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+        const familyTitle = `${NOTE_NAMES[rootIndex]} ${isMinorContext ? 'Minor' : 'Major'} Family`;
+
+        const chords = scaleSteps.map((step) => {
+          const noteIdx = (rootIndex + step.semitones) % 12;
+          const noteName = NOTE_NAMES[noteIdx];
+          const symbol = `${noteName}${step.suffix}`;
+          return {
+            degree: step.degree,
+            rootIndex: noteIdx,
+            rootName: noteName,
+            suffix: step.suffix,
+            symbol,
+            intervals: step.intervals,
+          };
+        });
+
+        return { familyTitle, chords };
+      }
+
+      function renderChordFamily(chordObj) {
+        els.chordFamilyGrid.innerHTML = '';
+
+        if (!chordObj) {
+          els.chordFamilyKeyBadge.textContent = 'Select or Play';
+          const empty = document.createElement('div');
+          empty.className = 'col-span-4 h-full rounded-2xl border border-dashed border-m3-outline dark:border-m3-darkOutline flex items-center justify-center text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant px-3 text-center';
+          empty.textContent = 'Play a chord on mic or pick a chord above to view its 7-chord family';
+          els.chordFamilyGrid.appendChild(empty);
+          return;
+        }
+
+        const { familyTitle, chords } = computeChordFamily(chordObj.rootIndex, chordObj.suffix);
+        els.chordFamilyKeyBadge.textContent = familyTitle;
+
+        chords.forEach((item) => {
+          const isCurrentChord =
+            item.rootIndex === chordObj.rootIndex &&
+            ((item.suffix === '' && (chordObj.suffix === '' || chordObj.suffix === '7' || chordObj.suffix === 'maj7' || chordObj.suffix === 'sus2' || chordObj.suffix === 'sus4')) ||
+              (item.suffix === 'm' && (chordObj.suffix === 'm' || chordObj.suffix === 'm7')));
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = isCurrentChord
+            ? 'm3-ripple rounded-xl border border-m3-primary dark:border-m3-darkPrimary bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex flex-col items-center justify-center px-1 py-1 transition cursor-pointer'
+            : 'm3-ripple rounded-xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow/70 dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurface dark:text-m3-darkOnSurface flex flex-col items-center justify-center px-1 py-1 transition cursor-pointer';
+
+          btn.innerHTML = `
+            <span class="text-[9px] font-mono opacity-75 leading-none">${item.degree}</span>
+            <span class="text-xs font-bold leading-tight mt-0.5">${item.symbol}</span>
+          `;
+
+          btn.addEventListener('click', () => {
+            const freqs = buildChordFrequencies(item.rootIndex, item.intervals);
+            playStrummedChord(freqs);
+            showFeedback(`Playing ${item.symbol} (${item.degree} in ${familyTitle})`, 'info');
+          });
+
+          els.chordFamilyGrid.appendChild(btn);
+        });
+      }
+
+      function applyManualChordSelection(rootIndex, qualityValue, playAudio = true) {
+        const tmpl =
+          CHORD_TEMPLATES.find((t) => (qualityValue === 'Major' ? t.suffix === '' : t.suffix === qualityValue)) ||
+          CHORD_TEMPLATES[CHORD_TEMPLATES.length - 1];
+
+        const chordObj = {
+          rootIndex,
+          rootName: NOTE_NAMES[rootIndex],
+          suffix: tmpl.suffix,
+          symbol: `${NOTE_NAMES[rootIndex]}${tmpl.suffix}`,
+          displayName: `${NOTE_NAMES[rootIndex]}${tmpl.displaySuffix}`,
+          quality: tmpl.quality,
+          intervals: tmpl.intervals,
+          chordNotes: tmpl.intervals.map((iv) => NOTE_NAMES[(rootIndex + iv) % 12]),
+          confidence: 100,
+        };
+
+        state.manualChordActive = true;
+        state.selectedManualSymbol = chordObj.symbol;
+
+        const simChroma = new Array(12).fill(0.04);
+        chordObj.intervals.forEach((iv, i) => {
+          const pc = (rootIndex + iv) % 12;
+          simChroma[pc] = i === 0 ? 1.0 : 0.86;
+          const fifthPc = (pc + 7) % 12;
+          simChroma[fifthPc] = Math.max(simChroma[fifthPc], 0.34);
+        });
+
+        updateChordDisplay(simChroma, `SELECTED · ${chordObj.symbol}`, true, chordObj);
+
+        if (playAudio) {
+          const freqs = buildChordFrequencies(rootIndex, tmpl.intervals);
+          playStrummedChord(freqs);
+        }
       }
 
       function renderChromaSpectrum(highlightedNotes = []) {
@@ -1034,27 +1259,16 @@
         });
       }
 
-      function updateChordDisplay(chroma, sourceLabel, immediate = false) {
-        const now = performance.now();
-
-        // Smooth chroma bars visually during live mic input to avoid jitter
-        if (!immediate && state.micActive) {
-          state.chromaEnergies = chroma.map((val, i) => {
-            const prev = state.chromaEnergies[i] || 0;
-            return val > prev ? prev * 0.45 + val * 0.55 : prev * 0.72 + val * 0.28;
-          });
-        } else {
-          state.chromaEnergies = chroma;
-        }
-
+      function updateChordDisplay(chroma, sourceLabel, immediate = false, forcedResult = null) {
+        state.chromaEnergies = chroma;
         els.chordSourceLabel.textContent = sourceLabel;
-        const rawResult = recognizeChordFromChroma(state.chromaEnergies);
 
-        let resultToShow = rawResult;
+        const now = performance.now();
+        const rawResult = forcedResult || recognizeChordFromChroma(chroma);
+        let result = rawResult;
 
-        if (!immediate && state.micActive) {
+        if (!immediate) {
           if (rawResult) {
-            // Require the same chord to remain steady for 260ms before switching display
             if (state.candidateChordName === rawResult.displayName) {
               if (now - state.candidateChordSince >= 260) {
                 state.displayedChord = rawResult;
@@ -1066,15 +1280,13 @@
             }
           } else {
             state.candidateChordName = null;
-            state.candidateChordSince = 0;
           }
 
-          // Hold the confirmed chord for 750ms after strum decay so background dips don't flicker
           if (state.displayedChord && (now - state.lastChordConfirmTime) < 750) {
-            resultToShow = state.displayedChord;
+            result = state.displayedChord;
           } else {
             state.displayedChord = null;
-            resultToShow = null;
+            result = null;
           }
         } else {
           state.displayedChord = rawResult;
@@ -1082,7 +1294,7 @@
           state.lastChordConfirmTime = rawResult ? now : 0;
         }
 
-        if (!resultToShow) {
+        if (!result) {
           els.chordNameDisplay.textContent = state.micActive ? 'Listening...' : 'Ready';
           els.chordQualityBadge.textContent = state.micActive ? 'Strum Guitar' : 'Standby';
           els.chordConfidencePct.textContent = '0%';
@@ -1090,18 +1302,18 @@
           els.chordIntervalsText.textContent = 'Intervals: --';
           els.chordActiveNotes.innerHTML = `<span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or select a chord below</span>`;
           renderChromaSpectrum([]);
-          renderChordFamily(null, null);
+          renderChordFamily(null);
           return;
         }
 
-        els.chordNameDisplay.textContent = resultToShow.displayName;
-        els.chordQualityBadge.textContent = resultToShow.quality;
-        els.chordConfidencePct.textContent = `${resultToShow.confidence}%`;
-        els.chordConfidenceBar.style.width = `${resultToShow.confidence}%`;
-        els.chordIntervalsText.textContent = `Intervals: [${resultToShow.intervals.join('-')}]`;
+        els.chordNameDisplay.textContent = result.displayName;
+        els.chordQualityBadge.textContent = result.quality;
+        els.chordConfidencePct.textContent = `${result.confidence}%`;
+        els.chordConfidenceBar.style.width = `${result.confidence}%`;
+        els.chordIntervalsText.textContent = `Intervals: [${result.intervals.join('-')}]`;
 
         els.chordActiveNotes.innerHTML = '';
-        resultToShow.chordNotes.forEach((n, index) => {
+        result.chordNotes.forEach((n, index) => {
           const chip = document.createElement('span');
           chip.className = index === 0
             ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
@@ -1110,178 +1322,16 @@
           els.chordActiveNotes.appendChild(chip);
         });
 
-        renderChromaSpectrum(resultToShow.chordNotes);
-        renderChordFamily(resultToShow.rootName, resultToShow.quality, resultToShow.displayName);
-      }
-
-      function getChordFamilyData(rootName, quality) {
-        const rootIdx = NOTE_NAMES.indexOf(rootName);
-        if (rootIdx === -1) return null;
-
-        const isMinorFamily = quality === 'Minor' || quality === 'Minor 7th';
-        const scaleSteps = isMinorFamily ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
-        const familyTitle = isMinorFamily ? `${rootName} Minor Family` : `${rootName} Major Family`;
-
-        const members = scaleSteps.map((step) => {
-          const chordRootIdx = (rootIdx + step.semitones) % 12;
-          const chordRootName = NOTE_NAMES[chordRootIdx];
-          const shortSymbol = `${chordRootName}${step.suffix}`;
-          const fullDisplay = step.suffix === '' ? `${chordRootName} Major` : shortSymbol;
-          const notes = step.intervals.map((iv) => NOTE_NAMES[(chordRootIdx + iv) % 12]);
-          const freqs = step.intervals.map((iv) => {
-            const midi = 48 + chordRootIdx + iv; // C3 octave base
-            return 440 * Math.pow(2, (midi - 69) / 12);
-          });
-
-          return {
-            degree: step.degree,
-            shortSymbol,
-            fullDisplay,
-            rootName: chordRootName,
-            suffix: step.suffix,
-            intervals: step.intervals,
-            notes,
-            freqs,
-          };
-        });
-
-        return { familyTitle, members };
-      }
-
-      function selectManualChord(rootName, qualityKey, playSound = true) {
-        const rootIdx = NOTE_NAMES.indexOf(rootName);
-        if (rootIdx === -1) return;
-
-        // Map dropdown value or family suffix to template
-        const normalizedKey = qualityKey === 'Major' ? '' : qualityKey;
-        const tmpl = CHORD_TEMPLATES.find((t) => t.suffix === normalizedKey) || {
-          suffix: normalizedKey,
-          displaySuffix: normalizedKey === 'dim' ? 'dim' : normalizedKey,
-          quality: normalizedKey === 'dim' ? 'Diminished' : 'Major',
-          intervals: normalizedKey === 'dim' ? [0, 3, 6] : [0, 4, 7],
-        };
-
-        const displayName = `${rootName}${tmpl.displaySuffix}`;
-        const chordNotes = tmpl.intervals.map((iv) => NOTE_NAMES[(rootIdx + iv) % 12]);
-        const freqs = tmpl.intervals.map((iv) => {
-          const midi = 48 + rootIdx + iv;
-          return 440 * Math.pow(2, (midi - 69) / 12);
-        });
-
-        state.manualChordActive = true;
-        state.selectedManualSymbol = displayName;
-
-        // Sync dropdown controls
-        els.manualChordRoot.value = rootName;
-        if (Array.from(els.manualChordQuality.options).some((opt) => opt.value === qualityKey)) {
-          els.manualChordQuality.value = qualityKey;
-        }
-
-        if (playSound) {
-          playStrummedChord(freqs);
-        }
-
-        // Build chroma vector for visual consistency
-        const simChroma = new Array(12).fill(0.04);
-        chordNotes.forEach((noteName, i) => {
-          const pc = NOTE_NAMES.indexOf(noteName);
-          if (pc !== -1) {
-            simChroma[pc] = i === 0 ? 1.0 : 0.86;
-          }
-        });
-
-        state.chromaEnergies = simChroma;
-        els.chordSourceLabel.textContent = 'MANUAL';
-        els.chordNameDisplay.textContent = displayName;
-        els.chordQualityBadge.textContent = tmpl.quality;
-        els.chordConfidencePct.textContent = '100%';
-        els.chordConfidenceBar.style.width = '100%';
-        els.chordIntervalsText.textContent = `Intervals: [${tmpl.intervals.join('-')}]`;
-
-        els.chordActiveNotes.innerHTML = '';
-        chordNotes.forEach((n, index) => {
-          const chip = document.createElement('span');
-          chip.className = index === 0
-            ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
-            : 'px-3 py-1 rounded-full text-xs font-mono font-semibold whitespace-nowrap shrink-0 bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
-          chip.textContent = index === 0 ? `${n} (Root)` : n;
-          els.chordActiveNotes.appendChild(chip);
-        });
-
-        renderChromaSpectrum(chordNotes);
-        renderChordFamily(rootName, tmpl.quality, displayName);
-      }
-
-      function renderChordFamily(rootName, quality, activeChordDisplay = null) {
-        els.chordFamilyGrid.innerHTML = '';
-
-        if (!rootName) {
-          els.chordFamilyKeyBadge.textContent = 'Select or Play';
-          const emptyMsg = document.createElement('div');
-          emptyMsg.className = 'col-span-4 h-full rounded-2xl bg-m3-containerLow/60 dark:bg-m3-darkContainerLow flex items-center justify-center text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant px-3 text-center';
-          emptyMsg.textContent = 'Play a chord on mic or pick a root & type above to view its 7-chord family';
-          els.chordFamilyGrid.appendChild(emptyMsg);
-          return;
-        }
-
-        const familyData = getChordFamilyData(rootName, quality);
-        if (!familyData) return;
-
-        els.chordFamilyKeyBadge.textContent = familyData.familyTitle;
-
-        familyData.members.forEach((member) => {
-          const isCurrent = activeChordDisplay === member.fullDisplay || activeChordDisplay === member.shortSymbol;
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = isCurrent
-            ? 'm3-ripple px-1.5 py-1 rounded-xl border border-[#188038] dark:border-[#81C995] bg-[#CEEAD6]/80 dark:bg-[#188038]/30 text-[#0D652D] dark:text-[#81C995] flex flex-col items-center justify-center transition cursor-pointer'
-            : 'm3-ripple px-1.5 py-1 rounded-xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow/70 dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurface dark:text-m3-darkOnSurface flex flex-col items-center justify-center transition cursor-pointer';
-
-          btn.innerHTML = `
-            <span class="text-[9px] font-mono opacity-75 leading-none">${member.degree}</span>
-            <span class="text-xs font-bold leading-tight mt-0.5 truncate max-w-full">${member.shortSymbol}</span>
-          `;
-
-          btn.addEventListener('click', () => {
-            playStrummedChord(member.freqs);
-            // Keep the current family visible while previewing any member chord
-            els.chordSourceLabel.textContent = 'FAMILY';
-            els.chordNameDisplay.textContent = member.fullDisplay;
-            els.chordQualityBadge.textContent = member.suffix === 'm' ? 'Minor' : member.suffix === 'dim' ? 'Diminished' : 'Major';
-            els.chordConfidencePct.textContent = '100%';
-            els.chordConfidenceBar.style.width = '100%';
-            els.chordIntervalsText.textContent = `Degree: ${member.degree}`;
-
-            els.chordActiveNotes.innerHTML = '';
-            member.notes.forEach((n, index) => {
-              const chip = document.createElement('span');
-              chip.className = index === 0
-                ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
-                : 'px-3 py-1 rounded-full text-xs font-mono font-semibold whitespace-nowrap shrink-0 bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
-              chip.textContent = index === 0 ? `${n} (Root)` : n;
-              els.chordActiveNotes.appendChild(chip);
-            });
-
-            const simChroma = new Array(12).fill(0.04);
-            member.notes.forEach((noteName, i) => {
-              const pc = NOTE_NAMES.indexOf(noteName);
-              if (pc !== -1) simChroma[pc] = i === 0 ? 1.0 : 0.86;
-            });
-            state.chromaEnergies = simChroma;
-            renderChromaSpectrum(member.notes);
-            renderChordFamily(rootName, quality, member.fullDisplay);
-          });
-
-          els.chordFamilyGrid.appendChild(btn);
-        });
+        renderChromaSpectrum(result.chordNotes);
+        renderChordFamily(result);
       }
 
       function populateManualChordRoots() {
         els.manualChordRoot.innerHTML = '';
-        NOTE_NAMES.forEach((note) => {
+        NOTE_NAMES.forEach((note, idx) => {
           const opt = document.createElement('option');
-          opt.value = note;
-          opt.textContent = note;
+          opt.value = String(idx);
+          opt.textContent = `${note} Root`;
           els.manualChordRoot.appendChild(opt);
         });
       }
@@ -1302,17 +1352,14 @@
             state.analyser.getFloatTimeDomainData(timeBuffer);
             const pitch = detectPitchAutocorrelation(timeBuffer, state.audioCtx.sampleRate);
             updateTunerDisplay(pitch);
-          } else {
-            // Do not overwrite manual selection while user is inspecting a chosen chord
-            if (!state.manualChordActive) {
-              state.analyser.getFloatFrequencyData(freqBuffer);
-              const chroma = computeChromaFromFFT(
-                freqBuffer,
-                state.audioCtx.sampleRate,
-                state.analyser.fftSize
-              );
-              updateChordDisplay(chroma, 'LIVE MIC');
-            }
+          } else if (!state.manualChordActive) {
+            state.analyser.getFloatFrequencyData(freqBuffer);
+            const chroma = computeChromaFromFFT(
+              freqBuffer,
+              state.audioCtx.sampleRate,
+              state.analyser.fftSize
+            );
+            updateChordDisplay(chroma, 'LIVE MIC');
           }
 
           state.rafId = requestAnimationFrame(tick);
@@ -1358,7 +1405,6 @@
           state.selectedManualSymbol = null;
           updateChordDisplay(new Array(12).fill(0), 'LIVE MIC', true);
 
-          // Update Extended FAB & Status Badge to active recording state
           els.micBtnLabel.textContent = 'Stop Mic';
           els.micIconOff.classList.add('hidden');
           els.micIconOn.classList.remove('hidden');
@@ -1367,10 +1413,11 @@
           els.audioStatusBadge.textContent = 'LIVE MIC';
           els.audioStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995] text-[10px] font-semibold tracking-wide';
 
+          requestScreenWakeLock();
           startAnalysisLoop();
         } catch (err) {
           console.error('Microphone error:', err);
-          showFeedback('Microphone permission denied or unavailable. Select a chord manually or grant mic permissions.', 'error');
+          showFeedback('Microphone permission denied or unavailable. Use the Chord Family selector or grant mic permissions.', 'error');
         }
       }
 
@@ -1386,7 +1433,6 @@
         }
         state.analyser = null;
 
-        // Restore Extended FAB & Status Badge
         els.micBtnLabel.textContent = 'Start Mic';
         els.micIconOff.classList.remove('hidden');
         els.micIconOn.classList.add('hidden');
@@ -1447,12 +1493,15 @@
       });
 
       els.btnSelectManualChord.addEventListener('click', () => {
-        selectManualChord(els.manualChordRoot.value, els.manualChordQuality.value, true);
+        const rootIdx = parseInt(els.manualChordRoot.value, 10) || 0;
+        const qualityVal = els.manualChordQuality.value || 'Major';
+        applyManualChordSelection(rootIdx, qualityVal, true);
       });
 
       els.btnClearChord.addEventListener('click', () => {
         state.manualChordActive = false;
         state.selectedManualSymbol = null;
+        hideFeedback();
         updateChordDisplay(new Array(12).fill(0), state.micActive ? 'LIVE MIC' : 'STANDBY', true);
       });
 
@@ -1465,6 +1514,7 @@
       updateTunerDisplay(null, true);
       populateManualChordRoots();
       updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
+      requestScreenWakeLock();
     });
   </script>
   <script>
