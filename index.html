@@ -470,7 +470,17 @@
         selectedString: GUITAR_STRINGS[0],
         currentCents: 0,
         currentDetectedFreq: null,
+        // Tuner anti-flicker smoothing & release hold state
+        smoothedFreq: null,
+        lastValidPitchTime: 0,
+        lastPitchString: null,
+        pitchConfirmCount: 0,
+        // Chord detector anti-flicker debounce & hold state
         chromaEnergies: new Array(12).fill(0),
+        candidateChordName: null,
+        candidateChordSince: 0,
+        displayedChord: null,
+        lastChordConfirmTime: 0,
         activePresetSymbol: null,
         simHoldTimeout: null,
         audioCtx: null,
@@ -637,7 +647,8 @@
           rms += val * val;
         }
         rms = Math.sqrt(rms / SIZE);
-        if (rms < 0.012) return null;
+        // Elevated noise gate threshold to ignore subtle ambient room noise
+        if (rms < 0.02) return null;
 
         let r1 = 0;
         let r2 = SIZE - 1;
@@ -682,7 +693,8 @@
           }
         }
 
-        if (maxPos <= 0 || maxVal < 0.01) return null;
+        // Require strong periodicity correlation (c[maxPos] / c[0] >= 0.45) to reject non-musical noise
+        if (maxPos <= 0 || c[0] <= 0 || (maxVal / c[0]) < 0.45) return null;
 
         let T0 = maxPos;
         if (T0 > 0 && T0 < newSize - 1) {
@@ -719,11 +731,50 @@
         return Math.max(-50, Math.min(50, raw));
       }
 
-      function updateTunerDisplay(detectedFreq) {
-        state.currentDetectedFreq = detectedFreq;
+      function updateTunerDisplay(detectedFreq, immediate = false) {
+        const now = performance.now();
+        let activeFreq = detectedFreq;
 
-        if (detectedFreq && state.autoStringLock) {
-          const nearest = findNearestGuitarString(detectedFreq);
+        if (!immediate && state.micActive) {
+          if (detectedFreq) {
+            // Require 3 consecutive stable frames (~50ms) before locking onto a new pitch
+            if (state.lastPitchString && Math.abs(1200 * Math.log2(detectedFreq / state.lastPitchString)) < 45) {
+              state.pitchConfirmCount++;
+            } else {
+              state.pitchConfirmCount = 1;
+            }
+            state.lastPitchString = detectedFreq;
+
+            if (state.pitchConfirmCount >= 3) {
+              // Exponential moving average smoothing for steady needle movement
+              state.smoothedFreq = state.smoothedFreq
+                ? state.smoothedFreq * 0.65 + detectedFreq * 0.35
+                : detectedFreq;
+              state.lastValidPitchTime = now;
+              activeFreq = state.smoothedFreq;
+            } else {
+              activeFreq = (now - state.lastValidPitchTime < 450) ? state.smoothedFreq : null;
+            }
+          } else {
+            state.pitchConfirmCount = 0;
+            // Hold last valid pitch for 450ms as note rings out so display doesn't flicker
+            if (state.smoothedFreq && (now - state.lastValidPitchTime) < 450) {
+              activeFreq = state.smoothedFreq;
+            } else {
+              state.smoothedFreq = null;
+              activeFreq = null;
+            }
+          }
+        } else if (immediate) {
+          state.smoothedFreq = detectedFreq;
+          state.pitchConfirmCount = 0;
+          state.lastValidPitchTime = 0;
+        }
+
+        state.currentDetectedFreq = activeFreq;
+
+        if (activeFreq && state.autoStringLock) {
+          const nearest = findNearestGuitarString(activeFreq);
           if (nearest.label !== state.selectedString.label) {
             state.selectedString = nearest;
             renderStringChips();
@@ -735,9 +786,9 @@
         els.tunerTargetFreq.textContent = `${target.freq.toFixed(2)} Hz`;
 
         let cents = 0;
-        if (detectedFreq) {
-          cents = calculateCents(detectedFreq, target.freq);
-          els.tunerLiveFreq.textContent = `Detected: ${detectedFreq.toFixed(2)} Hz`;
+        if (activeFreq) {
+          cents = calculateCents(activeFreq, target.freq);
+          els.tunerLiveFreq.textContent = `Detected: ${activeFreq.toFixed(2)} Hz`;
         } else {
           els.tunerLiveFreq.textContent = 'Detected: -- Hz';
         }
@@ -757,7 +808,7 @@
         );
 
         const absC = Math.abs(cents);
-        if (!detectedFreq) {
+        if (!activeFreq) {
           els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-m3-primary dark:bg-m3-darkPrimary border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
           els.tunerVerdictPill.textContent = state.micActive ? 'Listening — pluck a guitar string' : 'Start mic & pluck a string';
           els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold truncate bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant';
@@ -801,7 +852,7 @@
             updateAutoLockUI();
             renderStringChips();
             playGuitarReferenceNote(str.freq, 1.0);
-            updateTunerDisplay(null);
+            updateTunerDisplay(null, true);
           });
 
           els.stringButtonsGrid.appendChild(btn);
@@ -832,10 +883,11 @@
         let totalEnergy = 0;
         for (let bin = minBin; bin <= maxBin; bin++) {
           const db = freqData[bin];
-          if (db < -78) continue;
+          // Noise gate: ignore quiet room floor below -68 dB
+          if (db < -68) continue;
 
           // Linear amplitude with slight fundamental emphasis
-          const amp = Math.pow(10, (db + 80) / 36);
+          const amp = Math.pow(10, (db + 72) / 34);
           const freq = bin * binWidth;
           const midi = 69 + 12 * Math.log2(freq / 440);
           const pitchClass = ((Math.round(midi) % 12) + 12) % 12;
@@ -846,7 +898,8 @@
           totalEnergy += amp * registerWeight;
         }
 
-        if (totalEnergy < 12) {
+        // Require meaningful acoustic energy before classifying chords
+        if (totalEnergy < 26) {
           return new Array(12).fill(0);
         }
 
@@ -958,13 +1011,55 @@
         });
       }
 
-      function updateChordDisplay(chroma, sourceLabel) {
-        state.chromaEnergies = chroma;
+      function updateChordDisplay(chroma, sourceLabel, immediate = false) {
+        const now = performance.now();
+
+        // Smooth chroma bars visually during live mic input to avoid jitter
+        if (!immediate && state.micActive) {
+          state.chromaEnergies = chroma.map((val, i) => {
+            const prev = state.chromaEnergies[i] || 0;
+            return val > prev ? prev * 0.45 + val * 0.55 : prev * 0.72 + val * 0.28;
+          });
+        } else {
+          state.chromaEnergies = chroma;
+        }
+
         els.chordSourceLabel.textContent = sourceLabel;
+        const rawResult = recognizeChordFromChroma(state.chromaEnergies);
 
-        const result = recognizeChordFromChroma(chroma);
+        let resultToShow = rawResult;
 
-        if (!result) {
+        if (!immediate && state.micActive) {
+          if (rawResult) {
+            // Require the same chord to remain steady for 260ms before switching display
+            if (state.candidateChordName === rawResult.displayName) {
+              if (now - state.candidateChordSince >= 260) {
+                state.displayedChord = rawResult;
+                state.lastChordConfirmTime = now;
+              }
+            } else {
+              state.candidateChordName = rawResult.displayName;
+              state.candidateChordSince = now;
+            }
+          } else {
+            state.candidateChordName = null;
+            state.candidateChordSince = 0;
+          }
+
+          // Hold the confirmed chord for 750ms after strum decay so background dips don't flicker
+          if (state.displayedChord && (now - state.lastChordConfirmTime) < 750) {
+            resultToShow = state.displayedChord;
+          } else {
+            state.displayedChord = null;
+            resultToShow = null;
+          }
+        } else {
+          state.displayedChord = rawResult;
+          state.candidateChordName = rawResult ? rawResult.displayName : null;
+          state.lastChordConfirmTime = rawResult ? now : 0;
+        }
+
+        if (!resultToShow) {
           els.chordNameDisplay.textContent = state.micActive ? 'Listening...' : 'Ready';
           els.chordQualityBadge.textContent = state.micActive ? 'Strum Guitar' : 'Standby';
           els.chordConfidencePct.textContent = '0%';
@@ -975,14 +1070,14 @@
           return;
         }
 
-        els.chordNameDisplay.textContent = result.displayName;
-        els.chordQualityBadge.textContent = result.quality;
-        els.chordConfidencePct.textContent = `${result.confidence}%`;
-        els.chordConfidenceBar.style.width = `${result.confidence}%`;
-        els.chordIntervalsText.textContent = `Intervals: [${result.intervals.join('-')}]`;
+        els.chordNameDisplay.textContent = resultToShow.displayName;
+        els.chordQualityBadge.textContent = resultToShow.quality;
+        els.chordConfidencePct.textContent = `${resultToShow.confidence}%`;
+        els.chordConfidenceBar.style.width = `${resultToShow.confidence}%`;
+        els.chordIntervalsText.textContent = `Intervals: [${resultToShow.intervals.join('-')}]`;
 
         els.chordActiveNotes.innerHTML = '';
-        result.chordNotes.forEach((n, index) => {
+        resultToShow.chordNotes.forEach((n, index) => {
           const chip = document.createElement('span');
           chip.className = index === 0
             ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
@@ -991,7 +1086,7 @@
           els.chordActiveNotes.appendChild(chip);
         });
 
-        renderChromaSpectrum(result.chordNotes);
+        renderChromaSpectrum(resultToShow.chordNotes);
       }
 
       function renderChordPresetChips() {
@@ -1022,14 +1117,14 @@
               }
             });
 
-            updateChordDisplay(simChroma, `SIM · ${preset.symbol.toUpperCase()}`);
+            updateChordDisplay(simChroma, `SIM · ${preset.symbol.toUpperCase()}`, true);
 
             if (state.simHoldTimeout) clearTimeout(state.simHoldTimeout);
             state.simHoldTimeout = setTimeout(() => {
               state.activePresetSymbol = null;
               renderChordPresetChips();
               if (!state.micActive) {
-                updateChordDisplay(new Array(12).fill(0), 'STANDBY');
+                updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
               }
             }, 2600);
           });
@@ -1142,9 +1237,9 @@
         els.audioStatusBadge.textContent = 'STANDBY';
         els.audioStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant text-[10px] font-semibold tracking-wide';
 
-        updateTunerDisplay(null);
+        updateTunerDisplay(null, true);
         if (!state.activePresetSymbol) {
-          updateChordDisplay(new Array(12).fill(0), 'STANDBY');
+          updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
         }
       }
 
@@ -1197,7 +1292,7 @@
         if (state.simHoldTimeout) clearTimeout(state.simHoldTimeout);
         state.activePresetSymbol = null;
         renderChordPresetChips();
-        updateChordDisplay(new Array(12).fill(0), state.micActive ? 'LIVE MIC' : 'STANDBY');
+        updateChordDisplay(new Array(12).fill(0), state.micActive ? 'LIVE MIC' : 'STANDBY', true);
       });
 
       // =======================================================================
@@ -1206,9 +1301,9 @@
       applyTheme(false);
       updateAutoLockUI();
       renderStringChips();
-      updateTunerDisplay(null);
+      updateTunerDisplay(null, true);
       renderChordPresetChips();
-      updateChordDisplay(new Array(12).fill(0), 'STANDBY');
+      updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
     });
   </script>
   <script>
