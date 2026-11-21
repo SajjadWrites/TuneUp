@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TuneUp — Guitar Tuner &amp; Chord Detector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Roboto', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            m3: {
+              // Material You Light Surface & Accent Tokens
+              bg: '#F4F6F9',
+              surface: '#FFFFFF',
+              containerLow: '#EEF2F6',
+              container: '#E3E9F2',
+              outline: '#DDE2EA',
+              onSurface: '#1F1F1F',
+              onSurfaceVariant: '#444746',
+              primary: '#0B57D0',
+              primaryHover: '#1A73E8',
+              primaryContainer: '#D3E3FD',
+              onPrimaryContainer: '#041E49',
+              // Material You Dark Surface & Accent Tokens
+              darkBg: '#121316',
+              darkSurface: '#1E2025',
+              darkContainerLow: '#191B20',
+              darkContainer: '#282A30',
+              darkOutline: '#32353D',
+              darkOnSurface: '#E3E2E6',
+              darkOnSurfaceVariant: '#C4C6D0',
+              darkPrimary: '#A8C7FA',
+              darkPrimaryContainer: '#0842A0',
+              darkOnPrimaryContainer: '#D3E3FD',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: 'Inter', 'Roboto', system-ui, sans-serif;
+      overflow-x: hidden;
+      transition: background-color 200ms ease, color 200ms ease;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    .needle-transition {
+      transition: transform 95ms cubic-bezier(0.2, 0, 0, 1), background-color 150ms ease;
+    }
+    .m3-card-elevation {
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 14px rgba(15, 23, 42, 0.04);
+    }
+    .dark .m3-card-elevation {
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.36);
+    }
+    .m3-fab-shadow {
+      box-shadow: 0 4px 14px rgba(11, 87, 208, 0.28), 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+    .dark .m3-fab-shadow {
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    }
+    /* Material 3 Ripple Feedback */
+    .m3-ripple {
+      position: relative;
+      overflow: hidden;
+    }
+    .m3-ripple::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: currentColor;
+      opacity: 0;
+      transition: opacity 150ms ease;
+      pointer-events: none;
+    }
+    .m3-ripple:active::after {
+      opacity: 0.12;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center sm:p-4 select-none bg-m3-bg sm:bg-[#E7ECF4] dark:bg-m3-darkBg dark:sm:bg-[#0B0C0E] text-m3-onSurface dark:text-m3-darkOnSurface">
+
+  <!-- Android Material You Mobile App Container (Full-bleed on small mobile, 430px device frame on larger screens) -->
+  <div id="app-shell" class="w-full max-w-[430px] min-h-screen sm:min-h-[800px] sm:h-[852px] sm:max-h-[96vh] bg-m3-bg dark:bg-m3-darkBg sm:border sm:border-m3-outline dark:sm:border-m3-darkOutline sm:rounded-[32px] sm:shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-200">
+
+    <!-- Material 3 Top App Bar -->
+    <header class="px-5 pt-4 pb-3.5 bg-m3-bg/95 dark:bg-m3-darkBg/95 backdrop-blur-md z-10 border-b border-m3-outline/80 dark:border-m3-darkOutline/80">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-3">
+          <!-- Tonal App Icon -->
+          <div class="w-10 h-10 rounded-2xl bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-[20px] font-semibold tracking-tight leading-none text-m3-onSurface dark:text-m3-darkOnSurface">TuneUp</h1>
+              <span id="audio-status-badge" class="px-2.5 py-0.5 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant text-[10px] font-semibold tracking-wide">
+                STANDBY
+              </span>
+            </div>
+            <p class="text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-1">Guitar Tuner &amp; Chord Detector</p>
+          </div>
+        </div>
+
+        <!-- Material 3 Dark Mode Toggle Button -->
+        <button
+          id="btn-theme-toggle"
+          type="button"
+          aria-label="Toggle Material You Dark Theme"
+          title="Switch Light / Dark Theme"
+          class="m3-ripple w-10 h-10 rounded-full bg-m3-containerLow dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant flex items-center justify-center transition cursor-pointer shrink-0"
+        >
+          <!-- Moon icon shown in Light Mode -->
+          <svg id="icon-theme-dark" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+          </svg>
+          <!-- Sun icon shown in Dark Mode -->
+          <svg id="icon-theme-light" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Material 3 Pill-Shaped Two-Segment Control -->
+      <div role="tablist" aria-label="Analyzer Mode" class="relative grid grid-cols-2 mt-3.5 p-1 rounded-full border border-[#747775]/35 dark:border-[#8E918F]/35 bg-m3-surface dark:bg-m3-darkSurface">
+        <!-- Animated Sliding Tonal Pill -->
+        <div id="segment-pill" class="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer transition-transform duration-200 ease-out pointer-events-none"></div>
+
+        <button
+          id="tab-tuner"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          class="relative z-10 py-2 px-3 rounded-full text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer cursor-pointer"
+        >
+          <svg id="tab-tuner-check" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          <span>String Tuner</span>
+        </button>
+
+        <button
+          id="tab-chord"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          class="relative z-10 py-2 px-3 rounded-full text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant cursor-pointer"
+        >
+          <svg id="tab-chord-check" class="w-4 h-4 hidden shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          <span>Chord Detector</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Material 3 Inline Feedback / Permission Banner -->
+    <div id="feedback-banner" class="hidden mx-4 mt-3 px-4 py-2.5 rounded-2xl text-xs font-medium flex items-center justify-between gap-2 border">
+      <span id="feedback-text"></span>
+      <button id="feedback-close" type="button" aria-label="Dismiss notification" class="text-current opacity-75 hover:opacity-100 font-bold px-2 py-0.5 rounded-full cursor-pointer">&times;</button>
+    </div>
+
+    <!-- Scrollable Workspace -->
+    <main class="flex-1 overflow-y-auto no-scrollbar px-4 pt-4 pb-24 space-y-4">
+
+      <!-- ========================================================= -->
+      <!-- VIEW 1: STRING TUNER (EADGBE + Auto Detect, NO Simulator) -->
+      <!-- ========================================================= -->
+      <section id="view-tuner" class="space-y-4">
+
+        <!-- Elevated Material 3 Pitch Meter Card (24px border-radius) -->
+        <div id="tuner-gauge-card" class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-5 transition-all">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Target String</span>
+              <div class="flex items-baseline gap-2.5 mt-1">
+                <span id="tuner-note-name" class="text-[42px] leading-none font-bold tracking-tight text-m3-onSurface dark:text-m3-darkOnSurface">E2</span>
+                <span id="tuner-target-freq" class="text-xs font-mono tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">82.41 Hz</span>
+              </div>
+            </div>
+
+            <div class="text-right">
+              <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Deviation</span>
+              <div class="flex items-baseline justify-end gap-2 mt-1">
+                <span id="tuner-cents-readout" class="text-[28px] leading-none font-bold font-mono tabular-nums text-m3-onSurface dark:text-m3-darkOnSurface">0c</span>
+              </div>
+              <div id="tuner-live-freq" class="text-xs font-mono tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-1">Detected: -- Hz</div>
+            </div>
+          </div>
+
+          <!-- Precision Linear Cents Meter (-50c to +50c) -->
+          <div class="my-5">
+            <div class="flex justify-between text-[10px] font-mono tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mb-1.5 px-1">
+              <span class="text-[#E37400] dark:text-[#FBBF24] font-semibold">-50c FLAT</span>
+              <span>-25c</span>
+              <span class="text-[#188038] dark:text-[#81C995] font-semibold">0c · IN TUNE</span>
+              <span>+25c</span>
+              <span class="text-[#B3261E] dark:text-[#F2B8B5] font-semibold">SHARP +50c</span>
+            </div>
+
+            <div class="relative h-14 rounded-2xl bg-m3-containerLow dark:bg-m3-darkContainerLow border border-m3-outline dark:border-m3-darkOutline flex items-center px-2 overflow-hidden">
+              <!-- Center Sweet-Spot Zone (-5c to +5c) -->
+              <div class="absolute left-1/2 -translate-x-1/2 w-10 h-full bg-[#CEEAD6]/80 dark:bg-[#188038]/25 border-x border-[#188038]/40 dark:border-[#81C995]/40"></div>
+              <!-- Center Reference Line -->
+              <div class="absolute left-1/2 -translate-x-1/2 w-0.5 h-full bg-[#188038] dark:bg-[#81C995]"></div>
+
+              <!-- Scale Tick Marks -->
+              <div class="w-full flex justify-between items-center px-2 opacity-35">
+                <span class="w-0.5 h-4 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-2.5 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-3.5 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-2.5 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-5 bg-transparent"></span>
+                <span class="w-0.5 h-2.5 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-3.5 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-2.5 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+                <span class="w-0.5 h-4 bg-m3-onSurfaceVariant dark:bg-m3-darkOnSurfaceVariant rounded-full"></span>
+              </div>
+
+              <!-- Animated Pitch Needle Indicator -->
+              <div
+                id="tuner-needle"
+                class="needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-m3-primary dark:bg-m3-darkPrimary border-2 border-white dark:border-m3-darkSurface shadow-md z-10"
+                style="transform: translateX(-50%) translateX(0px);"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Tune Status Verdict Pill & Concert Pitch -->
+          <div class="flex items-center justify-between gap-2 pt-0.5">
+            <span id="tuner-verdict-pill" class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">
+              Start mic &amp; pluck a string
+            </span>
+            <span class="text-[11px] font-mono tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant shrink-0">A4 = 440 Hz</span>
+          </div>
+        </div>
+
+        <!-- Material 3 String Selector Filter Chips Card (Auto + Standard EADGBE) -->
+        <div class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">Standard Guitar Strings</h2>
+              <p id="tuner-mode-desc" class="text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Auto-detects nearest string · Tap chip for reference tone</p>
+            </div>
+
+            <!-- Auto Detect Filter Chip -->
+            <button
+              id="btn-auto-lock"
+              type="button"
+              class="m3-ripple px-3.5 py-1.5 rounded-full text-xs font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex items-center gap-1.5 transition cursor-pointer shrink-0"
+            >
+              <svg id="auto-lock-check" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              <span>Auto</span>
+            </button>
+          </div>
+
+          <!-- 6 Standard EADGBE String Filter Chips -->
+          <div id="string-buttons-grid" class="grid grid-cols-3 gap-2">
+            <!-- Populated cleanly via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- VIEW 2: REAL-TIME POLYPHONIC CHORD DETECTOR               -->
+      <!-- ========================================================= -->
+      <section id="view-chord" class="hidden space-y-4">
+
+        <!-- Elevated Material 3 Detected Chord Result Card (24px border-radius) -->
+        <div id="chord-result-card" class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-5 space-y-3.5">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Detected Chord</span>
+              <div class="flex flex-wrap items-center gap-2.5 mt-1">
+                <span id="chord-name-display" class="text-[36px] leading-none font-bold tracking-tight text-m3-onSurface dark:text-m3-darkOnSurface">Listening...</span>
+                <span id="chord-quality-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer">
+                  Ready
+                </span>
+              </div>
+            </div>
+
+            <div class="text-right shrink-0">
+              <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Confidence</span>
+              <div class="mt-1">
+                <span id="chord-confidence-pct" class="inline-block px-2.5 py-0.5 rounded-full text-sm font-bold font-mono tabular-nums bg-[#CEEAD6]/70 dark:bg-[#188038]/25 text-[#188038] dark:text-[#81C995]">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Material 3 Linear Progress Indicator -->
+          <div class="w-full h-2 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer overflow-hidden">
+            <div id="chord-confidence-bar" class="h-full w-0 bg-m3-primary dark:bg-m3-darkPrimary transition-all duration-200 rounded-full"></div>
+          </div>
+
+          <!-- Active Constituent Notes Chips -->
+          <div>
+            <div class="flex items-center justify-between text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mb-2">
+              <span class="font-medium uppercase tracking-wider">Constituent Notes</span>
+              <span id="chord-intervals-text" class="font-mono">Intervals: --</span>
+            </div>
+            <div id="chord-active-notes" class="flex flex-wrap gap-1.5 min-h-[30px] items-center">
+              <span class="text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Material 3 Card: 12-Note Chroma Spectrum Visualizer -->
+        <div class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">12-Note Chroma Spectrum</h2>
+            <span id="chord-source-label" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">STANDBY</span>
+          </div>
+          <div id="chroma-bars-container" class="grid grid-cols-12 gap-1.5 items-end h-24 pt-2">
+            <!-- Populated cleanly via JS -->
+          </div>
+        </div>
+
+        <!-- Material 3 Card: Chord Preset / Test Simulator Chips -->
+        <div class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">Chord Test Simulator</h2>
+              <p class="text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Tap a chord preset to synthesize guitar audio &amp; test detection</p>
+            </div>
+            <button id="btn-clear-chord" type="button" class="m3-ripple text-xs font-semibold text-m3-primary dark:text-m3-darkPrimary hover:bg-m3-primaryContainer/50 dark:hover:bg-m3-darkPrimaryContainer/40 px-3 py-1.5 rounded-full transition cursor-pointer shrink-0">
+              Reset
+            </button>
+          </div>
+
+          <div id="chord-presets-grid" class="grid grid-cols-4 gap-2">
+            <!-- Populated cleanly via JS -->
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Bottom-Anchored Material 3 Extended Floating Action Button (Extended FAB) -->
+    <div class="pointer-events-none absolute inset-x-0 bottom-0 p-4 flex justify-center bg-gradient-to-t from-m3-bg via-m3-bg/90 to-transparent dark:from-m3-darkBg dark:via-m3-darkBg/90">
+      <button
+        id="btn-mic-toggle"
+        type="button"
+        aria-label="Toggle Microphone"
+        class="pointer-events-auto m3-ripple m3-fab-shadow flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-m3-primary hover:bg-m3-primaryHover dark:bg-m3-darkPrimary text-white dark:text-[#041E49] text-sm font-semibold tracking-wide transition-all active:scale-[0.98] cursor-pointer"
+      >
+        <svg id="mic-icon-off" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+        </svg>
+        <svg id="mic-icon-on" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.41 2.72 6.23 6 6.72V22h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
+        </svg>
+        <span id="mic-btn-label">Start Mic</span>
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    /**
+     * TuneUp — Material Design 3 Guitar Tuner & Real-Time Chord Detector
+     * Complete self-contained DSP + UI logic with zero missing DOM references.
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+      // =======================================================================
+      // 1. CONSTANTS & MUSICAL DATA MODELS
+      // =======================================================================
+      const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+      const GUITAR_STRINGS = [
+        { id: 6, label: 'E2', note: 'E', octave: 2, freq: 82.41 },
+        { id: 5, label: 'A2', note: 'A', octave: 2, freq: 110.00 },
+        { id: 4, label: 'D3', note: 'D', octave: 3, freq: 146.83 },
+        { id: 3, label: 'G3', note: 'G', octave: 3, freq: 196.00 },
+        { id: 2, label: 'B3', note: 'B', octave: 3, freq: 246.94 },
+        { id: 1, label: 'E4', note: 'E', octave: 4, freq: 329.63 },
+      ];
+
+      // Chord templates supporting Major, Minor, Dominant 7th, Major 7th, Minor 7th, Sus2, Sus4
+      const CHORD_TEMPLATES = [
+        { suffix: 'maj7',  displaySuffix: 'maj7',  quality: 'Major 7th',   intervals: [0, 4, 7, 11] },
+        { suffix: 'm7',    displaySuffix: 'm7',    quality: 'Minor 7th',   intervals: [0, 3, 7, 10] },
+        { suffix: '7',     displaySuffix: '7',     quality: 'Dominant 7th',intervals: [0, 4, 7, 10] },
+        { suffix: 'sus2',  displaySuffix: 'sus2',  quality: 'Suspended 2', intervals: [0, 2, 7] },
+        { suffix: 'sus4',  displaySuffix: 'sus4',  quality: 'Suspended 4', intervals: [0, 5, 7] },
+        { suffix: 'm',     displaySuffix: 'm',     quality: 'Minor',       intervals: [0, 3, 7] },
+        { suffix: '',      displaySuffix: ' Major',quality: 'Major',       intervals: [0, 4, 7] },
+      ];
+
+      const CHORD_PRESETS = [
+        {
+          symbol: 'C Maj',
+          notes: ['C', 'E', 'G'],
+          freqs: [130.81, 164.81, 196.00, 261.63, 329.63]
+        },
+        {
+          symbol: 'G Maj',
+          notes: ['G', 'B', 'D'],
+          freqs: [98.00, 123.47, 146.83, 196.00, 246.94, 392.00]
+        },
+        {
+          symbol: 'Am',
+          notes: ['A', 'C', 'E'],
+          freqs: [110.00, 164.81, 220.00, 261.63, 329.63]
+        },
+        {
+          symbol: 'F Maj',
+          notes: ['F', 'A', 'C'],
+          freqs: [87.31, 130.81, 174.61, 220.00, 261.63, 349.23]
+        },
+        {
+          symbol: 'D Maj',
+          notes: ['D', 'F#', 'A'],
+          freqs: [146.83, 220.00, 293.66, 369.99]
+        },
+        {
+          symbol: 'Em',
+          notes: ['E', 'G', 'B'],
+          freqs: [82.41, 123.47, 164.81, 196.00, 246.94, 329.63]
+        },
+        {
+          symbol: 'E7',
+          notes: ['E', 'G#', 'B', 'D'],
+          freqs: [82.41, 123.47, 146.83, 207.65, 246.94, 329.63]
+        },
+        {
+          symbol: 'Cmaj7',
+          notes: ['C', 'E', 'G', 'B'],
+          freqs: [130.81, 196.00, 246.94, 261.63, 329.63]
+        },
+      ];
+
+      // =======================================================================
+      // 2. APPLICATION STATE
+      // =======================================================================
+      const state = {
+        darkMode: false,
+        activeTab: 'tuner',
+        micActive: false,
+        autoStringLock: true,
+        selectedString: GUITAR_STRINGS[0],
+        currentCents: 0,
+        currentDetectedFreq: null,
+        chromaEnergies: new Array(12).fill(0),
+        activePresetSymbol: null,
+        simHoldTimeout: null,
+        audioCtx: null,
+        analyser: null,
+        micStream: null,
+        rafId: null,
+      };
+
+      // =======================================================================
+      // 3. DOM ELEMENT REFERENCES (Every ID verified against HTML)
+      // =======================================================================
+      const els = {
+        btnThemeToggle: document.getElementById('btn-theme-toggle'),
+        iconThemeDark: document.getElementById('icon-theme-dark'),
+        iconThemeLight: document.getElementById('icon-theme-light'),
+        audioStatusBadge: document.getElementById('audio-status-badge'),
+        btnMicToggle: document.getElementById('btn-mic-toggle'),
+        micIconOff: document.getElementById('mic-icon-off'),
+        micIconOn: document.getElementById('mic-icon-on'),
+        micBtnLabel: document.getElementById('mic-btn-label'),
+        segmentPill: document.getElementById('segment-pill'),
+        tabTuner: document.getElementById('tab-tuner'),
+        tabChord: document.getElementById('tab-chord'),
+        tabTunerCheck: document.getElementById('tab-tuner-check'),
+        tabChordCheck: document.getElementById('tab-chord-check'),
+        viewTuner: document.getElementById('view-tuner'),
+        viewChord: document.getElementById('view-chord'),
+        feedbackBanner: document.getElementById('feedback-banner'),
+        feedbackText: document.getElementById('feedback-text'),
+        feedbackClose: document.getElementById('feedback-close'),
+        // Tuner view
+        btnAutoLock: document.getElementById('btn-auto-lock'),
+        autoLockCheck: document.getElementById('auto-lock-check'),
+        tunerModeDesc: document.getElementById('tuner-mode-desc'),
+        tunerGaugeCard: document.getElementById('tuner-gauge-card'),
+        tunerNoteName: document.getElementById('tuner-note-name'),
+        tunerTargetFreq: document.getElementById('tuner-target-freq'),
+        tunerCentsReadout: document.getElementById('tuner-cents-readout'),
+        tunerLiveFreq: document.getElementById('tuner-live-freq'),
+        tunerNeedle: document.getElementById('tuner-needle'),
+        tunerVerdictPill: document.getElementById('tuner-verdict-pill'),
+        stringButtonsGrid: document.getElementById('string-buttons-grid'),
+        // Chord detector view
+        chordResultCard: document.getElementById('chord-result-card'),
+        chordNameDisplay: document.getElementById('chord-name-display'),
+        chordQualityBadge: document.getElementById('chord-quality-badge'),
+        chordConfidencePct: document.getElementById('chord-confidence-pct'),
+        chordConfidenceBar: document.getElementById('chord-confidence-bar'),
+        chordIntervalsText: document.getElementById('chord-intervals-text'),
+        chordActiveNotes: document.getElementById('chord-active-notes'),
+        chordSourceLabel: document.getElementById('chord-source-label'),
+        chromaBarsContainer: document.getElementById('chroma-bars-container'),
+        chordPresetsGrid: document.getElementById('chord-presets-grid'),
+        btnClearChord: document.getElementById('btn-clear-chord'),
+      };
+
+      // =======================================================================
+      // 4. THEME & NOTIFICATION HELPERS
+      // =======================================================================
+      function applyTheme(isDark) {
+        state.darkMode = isDark;
+        document.documentElement.classList.toggle('dark', isDark);
+        els.iconThemeDark.classList.toggle('hidden', isDark);
+        els.iconThemeLight.classList.toggle('hidden', !isDark);
+      }
+
+      function showFeedback(message, type = 'info') {
+        els.feedbackText.textContent = message;
+        els.feedbackBanner.classList.remove(
+          'hidden',
+          'bg-[#FCE8E6]', 'border-[#F2B8B5]', 'text-[#B3261E]',
+          'dark:bg-[#601410]', 'dark:border-[#8C1D18]', 'dark:text-[#F2B8B5]',
+          'bg-m3-primaryContainer', 'border-m3-primary/30', 'text-m3-onPrimaryContainer',
+          'dark:bg-m3-darkPrimaryContainer', 'dark:border-m3-darkPrimary/30', 'dark:text-m3-darkOnPrimaryContainer'
+        );
+
+        if (type === 'error') {
+          els.feedbackBanner.classList.add(
+            'bg-[#FCE8E6]', 'border-[#F2B8B5]', 'text-[#B3261E]',
+            'dark:bg-[#601410]', 'dark:border-[#8C1D18]', 'dark:text-[#F2B8B5]'
+          );
+        } else {
+          els.feedbackBanner.classList.add(
+            'bg-m3-primaryContainer', 'border-m3-primary/30', 'text-m3-onPrimaryContainer',
+            'dark:bg-m3-darkPrimaryContainer', 'dark:border-m3-darkPrimary/30', 'dark:text-m3-darkOnPrimaryContainer'
+          );
+        }
+      }
+
+      function hideFeedback() {
+        els.feedbackBanner.classList.add('hidden');
+      }
+
+      // =======================================================================
+      // 5. WEB AUDIO SYNTHESIS (Reference String Tone & Chord Preset Audio)
+      // =======================================================================
+      function ensureAudioContext() {
+        if (!state.audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          state.audioCtx = new AudioContextClass();
+        }
+        if (state.audioCtx.state === 'suspended') {
+          state.audioCtx.resume();
+        }
+        return state.audioCtx;
+      }
+
+      function playGuitarReferenceNote(freq, duration = 1.0, delay = 0) {
+        try {
+          const ctx = ensureAudioContext();
+          const now = ctx.currentTime + delay;
+
+          const oscMain = ctx.createOscillator();
+          const oscHarmonic = ctx.createOscillator();
+          const filter = ctx.createBiquadFilter();
+          const gain = ctx.createGain();
+
+          oscMain.type = 'triangle';
+          oscMain.frequency.setValueAtTime(freq, now);
+
+          oscHarmonic.type = 'sine';
+          oscHarmonic.frequency.setValueAtTime(freq * 2, now);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(Math.min(2600, freq * 6), now);
+          filter.frequency.exponentialRampToValueAtTime(Math.max(320, freq * 1.8), now + duration);
+
+          const harmonicGain = ctx.createGain();
+          harmonicGain.gain.setValueAtTime(0.24, now);
+
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+          oscMain.connect(filter);
+          oscHarmonic.connect(harmonicGain);
+          harmonicGain.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+
+          oscMain.start(now);
+          oscHarmonic.start(now);
+          oscMain.stop(now + duration + 0.03);
+          oscHarmonic.stop(now + duration + 0.03);
+        } catch (err) {
+          console.warn('Reference audio playback skipped:', err);
+        }
+      }
+
+      function playStrummedChord(freqs) {
+        freqs.forEach((f, idx) => {
+          playGuitarReferenceNote(f, 1.35, idx * 0.035);
+        });
+      }
+
+      // =======================================================================
+      // 6. TUNER DSP (Autocorrelation Pitch Detection) & UI RENDERING
+      // =======================================================================
+      function detectPitchAutocorrelation(buffer, sampleRate) {
+        const SIZE = buffer.length;
+        let rms = 0;
+        for (let i = 0; i < SIZE; i++) {
+          const val = buffer[i];
+          rms += val * val;
+        }
+        rms = Math.sqrt(rms / SIZE);
+        if (rms < 0.012) return null;
+
+        let r1 = 0;
+        let r2 = SIZE - 1;
+        const threshold = 0.2;
+        for (let i = 0; i < SIZE / 2; i++) {
+          if (Math.abs(buffer[i]) < threshold) {
+            r1 = i;
+            break;
+          }
+        }
+        for (let i = 1; i < SIZE / 2; i++) {
+          if (Math.abs(buffer[SIZE - i]) < threshold) {
+            r2 = SIZE - i;
+            break;
+          }
+        }
+
+        const trimmed = buffer.slice(r1, r2);
+        const newSize = trimmed.length;
+        if (newSize < 64) return null;
+
+        const c = new Float32Array(newSize);
+        for (let i = 0; i < newSize; i++) {
+          let sum = 0;
+          for (let j = 0; j < newSize - i; j++) {
+            sum += trimmed[j] * trimmed[j + i];
+          }
+          c[i] = sum;
+        }
+
+        let d = 0;
+        while (d < newSize - 1 && c[d] > c[d + 1]) {
+          d++;
+        }
+
+        let maxVal = -1;
+        let maxPos = -1;
+        for (let i = d; i < newSize; i++) {
+          if (c[i] > maxVal) {
+            maxVal = c[i];
+            maxPos = i;
+          }
+        }
+
+        if (maxPos <= 0 || maxVal < 0.01) return null;
+
+        let T0 = maxPos;
+        if (T0 > 0 && T0 < newSize - 1) {
+          const x1 = c[T0 - 1];
+          const x2 = c[T0];
+          const x3 = c[T0 + 1];
+          const a = (x1 + x3 - 2 * x2) / 2;
+          const b = (x3 - x1) / 2;
+          if (a !== 0) {
+            T0 = T0 - b / (2 * a);
+          }
+        }
+
+        const freq = sampleRate / T0;
+        if (freq < 60 || freq > 1100) return null;
+        return freq;
+      }
+
+      function findNearestGuitarString(freq) {
+        let best = GUITAR_STRINGS[0];
+        let minDiff = Infinity;
+        for (const str of GUITAR_STRINGS) {
+          const diff = Math.abs(1200 * Math.log2(freq / str.freq));
+          if (diff < minDiff) {
+            minDiff = diff;
+            best = str;
+          }
+        }
+        return best;
+      }
+
+      function calculateCents(detectedFreq, targetFreq) {
+        const raw = 1200 * Math.log2(detectedFreq / targetFreq);
+        return Math.max(-50, Math.min(50, raw));
+      }
+
+      function updateTunerDisplay(detectedFreq) {
+        state.currentDetectedFreq = detectedFreq;
+
+        if (detectedFreq && state.autoStringLock) {
+          const nearest = findNearestGuitarString(detectedFreq);
+          if (nearest.label !== state.selectedString.label) {
+            state.selectedString = nearest;
+            renderStringChips();
+          }
+        }
+
+        const target = state.selectedString;
+        els.tunerNoteName.textContent = target.label;
+        els.tunerTargetFreq.textContent = `${target.freq.toFixed(2)} Hz`;
+
+        let cents = 0;
+        if (detectedFreq) {
+          cents = calculateCents(detectedFreq, target.freq);
+          els.tunerLiveFreq.textContent = `Detected: ${detectedFreq.toFixed(2)} Hz`;
+        } else {
+          els.tunerLiveFreq.textContent = 'Detected: -- Hz';
+        }
+
+        state.currentCents = cents;
+        const roundedCents = Math.round(cents);
+        els.tunerCentsReadout.textContent = `${roundedCents > 0 ? '+' : ''}${roundedCents}c`;
+
+        // Needle horizontal travel inside linear meter (-112px to +112px)
+        const offsetPx = (cents / 50) * 112;
+        els.tunerNeedle.style.transform = `translateX(-50%) translateX(${offsetPx.toFixed(1)}px)`;
+
+        // Reset semantic card ring
+        els.tunerGaugeCard.classList.remove(
+          'border-[#188038]', 'dark:border-[#81C995]',
+          'ring-2', 'ring-[#188038]/20', 'dark:ring-[#81C995]/20'
+        );
+
+        const absC = Math.abs(cents);
+        if (!detectedFreq) {
+          els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-m3-primary dark:bg-m3-darkPrimary border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
+          els.tunerVerdictPill.textContent = state.micActive ? 'Listening — pluck a guitar string' : 'Start mic & pluck a string';
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant';
+        } else if (absC <= 5) {
+          els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-[#188038] dark:bg-[#81C995] border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
+          els.tunerVerdictPill.textContent = `In Tune · ${target.label}`;
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]';
+          els.tunerGaugeCard.classList.add('border-[#188038]', 'dark:border-[#81C995]', 'ring-2', 'ring-[#188038]/20', 'dark:ring-[#81C995]/20');
+        } else if (cents < -5) {
+          els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-[#E37400] dark:bg-[#FBBF24] border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
+          els.tunerVerdictPill.textContent = `Flat (${roundedCents}c) · Tune Up`;
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#FEF7E0] text-[#B06000] dark:bg-[#E37400]/25 dark:text-[#FBBF24]';
+        } else {
+          els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-[#B3261E] dark:bg-[#F2B8B5] border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
+          els.tunerVerdictPill.textContent = `Sharp (+${roundedCents}c) · Tune Down`;
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#FCE8E6] text-[#B3261E] dark:bg-[#B3261E]/30 dark:text-[#F2B8B5]';
+        }
+      }
+
+      function renderStringChips() {
+        els.stringButtonsGrid.innerHTML = '';
+        GUITAR_STRINGS.forEach((str) => {
+          const isSelected = state.selectedString.label === str.label;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = isSelected
+            ? 'm3-ripple py-2.5 px-3 rounded-2xl border border-m3-primary dark:border-m3-darkPrimary bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex flex-col items-center justify-center transition cursor-pointer'
+            : 'm3-ripple py-2.5 px-3 rounded-2xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow/70 dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurface dark:text-m3-darkOnSurface flex flex-col items-center justify-center transition cursor-pointer';
+
+          btn.innerHTML = `
+            <div class="flex items-center gap-1">
+              <span class="text-sm font-bold leading-tight">${str.label}</span>
+              <span class="text-[10px] opacity-75">· S${str.id}</span>
+            </div>
+            <span class="text-[10px] font-mono tabular-nums opacity-80 mt-0.5">${str.freq.toFixed(2)} Hz</span>
+          `;
+
+          btn.addEventListener('click', () => {
+            state.selectedString = str;
+            state.autoStringLock = false;
+            updateAutoLockUI();
+            renderStringChips();
+            playGuitarReferenceNote(str.freq, 1.0);
+            updateTunerDisplay(null);
+          });
+
+          els.stringButtonsGrid.appendChild(btn);
+        });
+      }
+
+      function updateAutoLockUI() {
+        if (state.autoStringLock) {
+          els.btnAutoLock.className = 'm3-ripple px-3.5 py-1.5 rounded-full text-xs font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer flex items-center gap-1.5 transition cursor-pointer shrink-0';
+          els.autoLockCheck.classList.remove('hidden');
+          els.tunerModeDesc.textContent = 'Auto-detects nearest string · Tap chip for reference tone';
+        } else {
+          els.btnAutoLock.className = 'm3-ripple px-3.5 py-1.5 rounded-full text-xs font-semibold border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow dark:bg-m3-darkContainerLow text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant flex items-center gap-1.5 transition cursor-pointer shrink-0';
+          els.autoLockCheck.classList.add('hidden');
+          els.tunerModeDesc.textContent = `Locked on ${state.selectedString.label} (${state.selectedString.freq.toFixed(2)} Hz) · Tap Auto to unlock`;
+        }
+      }
+
+      // =======================================================================
+      // 7. POLYPHONIC CHORD DETECTOR DSP & UI RENDERING
+      // =======================================================================
+      function computeChromaFromFFT(freqData, sampleRate, fftSize) {
+        const chroma = new Array(12).fill(0);
+        const binWidth = sampleRate / fftSize;
+        const minBin = Math.max(1, Math.floor(70 / binWidth));
+        const maxBin = Math.min(freqData.length - 1, Math.ceil(1200 / binWidth));
+
+        let totalEnergy = 0;
+        for (let bin = minBin; bin <= maxBin; bin++) {
+          const db = freqData[bin];
+          if (db < -78) continue;
+
+          // Linear amplitude with slight fundamental emphasis
+          const amp = Math.pow(10, (db + 80) / 36);
+          const freq = bin * binWidth;
+          const midi = 69 + 12 * Math.log2(freq / 440);
+          const pitchClass = ((Math.round(midi) % 12) + 12) % 12;
+
+          // Weight lower guitar register slightly higher to suppress upper overtone confusion
+          const registerWeight = freq < 360 ? 1.25 : 0.85;
+          chroma[pitchClass] += amp * registerWeight;
+          totalEnergy += amp * registerWeight;
+        }
+
+        if (totalEnergy < 12) {
+          return new Array(12).fill(0);
+        }
+
+        const maxVal = Math.max(...chroma);
+        if (maxVal <= 0) return new Array(12).fill(0);
+        return chroma.map((v) => v / maxVal);
+      }
+
+      function recognizeChordFromChroma(chroma) {
+        const maxEnergy = Math.max(...chroma);
+        if (maxEnergy < 0.25) {
+          return null;
+        }
+
+        // Extract salient pitch classes
+        const activeIndices = [];
+        chroma.forEach((val, idx) => {
+          if (val >= 0.36) activeIndices.push(idx);
+        });
+
+        if (activeIndices.length < 2) {
+          return null;
+        }
+
+        let bestMatch = null;
+        let bestScore = -Infinity;
+
+        for (let root = 0; root < 12; root++) {
+          if (chroma[root] < 0.32) continue;
+
+          for (const tmpl of CHORD_TEMPLATES) {
+            let inChordScore = 0;
+            let matchedCount = 0;
+
+            for (const interval of tmpl.intervals) {
+              const pc = (root + interval) % 12;
+              const weight = interval === 0 ? 1.45 : interval === 7 ? 1.05 : 1.2;
+              inChordScore += chroma[pc] * weight;
+              if (chroma[pc] >= 0.32) matchedCount++;
+            }
+
+            if (matchedCount < Math.min(3, tmpl.intervals.length)) continue;
+
+            // Penalize strong non-chord tones
+            let outChordPenalty = 0;
+            for (let pc = 0; pc < 12; pc++) {
+              const relInterval = (pc - root + 12) % 12;
+              if (!tmpl.intervals.includes(relInterval) && chroma[pc] > 0.34) {
+                outChordPenalty += chroma[pc] * 0.9;
+              }
+            }
+
+            const normalizedScore = (inChordScore - outChordPenalty) / (tmpl.intervals.length * 1.15);
+            if (normalizedScore > bestScore) {
+              bestScore = normalizedScore;
+              bestMatch = {
+                rootName: NOTE_NAMES[root],
+                displayName: `${NOTE_NAMES[root]}${tmpl.displaySuffix}`,
+                quality: tmpl.quality,
+                intervals: tmpl.intervals,
+                chordNotes: tmpl.intervals.map((iv) => NOTE_NAMES[(root + iv) % 12]),
+                confidence: Math.max(42, Math.min(99, Math.round(normalizedScore * 100))),
+              };
+            }
+          }
+        }
+
+        if (!bestMatch || bestScore < 0.44) {
+          return null;
+        }
+
+        return bestMatch;
+      }
+
+      function renderChromaSpectrum(highlightedNotes = []) {
+        const highlightSet = new Set(highlightedNotes);
+        els.chromaBarsContainer.innerHTML = '';
+
+        NOTE_NAMES.forEach((note, idx) => {
+          const energy = Math.max(0, Math.min(1, state.chromaEnergies[idx] || 0));
+          const heightPct = Math.max(10, Math.round(energy * 100));
+          const isChordTone = highlightSet.has(note) && energy > 0.25;
+
+          const col = document.createElement('div');
+          col.className = 'flex flex-col items-center justify-end h-full gap-1.5';
+
+          const barBg = document.createElement('div');
+          barBg.className = 'w-full h-16 rounded-full bg-m3-containerLow dark:bg-m3-darkContainerLow flex items-end overflow-hidden p-0.5';
+
+          const fill = document.createElement('div');
+          fill.className = isChordTone
+            ? 'w-full rounded-full bg-[#188038] dark:bg-[#81C995] transition-all duration-100'
+            : energy > 0.25
+              ? 'w-full rounded-full bg-m3-primary dark:bg-m3-darkPrimary transition-all duration-100'
+              : 'w-full rounded-full bg-m3-onSurfaceVariant/25 dark:bg-m3-darkOnSurfaceVariant/25 transition-all duration-100';
+          fill.style.height = `${heightPct}%`;
+
+          barBg.appendChild(fill);
+
+          const label = document.createElement('span');
+          label.className = isChordTone
+            ? 'text-[10px] font-mono font-bold text-[#188038] dark:text-[#81C995]'
+            : 'text-[10px] font-mono text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant';
+          label.textContent = note;
+
+          col.appendChild(barBg);
+          col.appendChild(label);
+          els.chromaBarsContainer.appendChild(col);
+        });
+      }
+
+      function updateChordDisplay(chroma, sourceLabel) {
+        state.chromaEnergies = chroma;
+        els.chordSourceLabel.textContent = sourceLabel;
+
+        const result = recognizeChordFromChroma(chroma);
+
+        if (!result) {
+          els.chordNameDisplay.textContent = state.micActive ? 'Listening...' : 'Ready';
+          els.chordQualityBadge.textContent = state.micActive ? 'Strum Guitar' : 'Standby';
+          els.chordConfidencePct.textContent = '0%';
+          els.chordConfidenceBar.style.width = '0%';
+          els.chordIntervalsText.textContent = 'Intervals: --';
+          els.chordActiveNotes.innerHTML = `<span class="text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>`;
+          renderChromaSpectrum([]);
+          return;
+        }
+
+        els.chordNameDisplay.textContent = result.displayName;
+        els.chordQualityBadge.textContent = result.quality;
+        els.chordConfidencePct.textContent = `${result.confidence}%`;
+        els.chordConfidenceBar.style.width = `${result.confidence}%`;
+        els.chordIntervalsText.textContent = `Intervals: [${result.intervals.join('-')}]`;
+
+        els.chordActiveNotes.innerHTML = '';
+        result.chordNotes.forEach((n, index) => {
+          const chip = document.createElement('span');
+          chip.className = index === 0
+            ? 'px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
+            : 'px-3 py-1 rounded-full text-xs font-mono font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
+          chip.textContent = index === 0 ? `${n} (Root)` : n;
+          els.chordActiveNotes.appendChild(chip);
+        });
+
+        renderChromaSpectrum(result.chordNotes);
+      }
+
+      function renderChordPresetChips() {
+        els.chordPresetsGrid.innerHTML = '';
+        CHORD_PRESETS.forEach((preset) => {
+          const isActive = state.activePresetSymbol === preset.symbol;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = isActive
+            ? 'm3-ripple py-2.5 px-2 rounded-2xl border border-m3-primary dark:border-m3-darkPrimary bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer text-xs font-semibold transition cursor-pointer text-center'
+            : 'm3-ripple py-2.5 px-2 rounded-2xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow/70 dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurface dark:text-m3-darkOnSurface text-xs font-semibold transition cursor-pointer text-center';
+          btn.textContent = preset.symbol;
+
+          btn.addEventListener('click', () => {
+            state.activePresetSymbol = preset.symbol;
+            renderChordPresetChips();
+            playStrummedChord(preset.freqs);
+
+            // Build realistic harmonic chroma vector from preset chord notes
+            const simChroma = new Array(12).fill(0.04);
+            preset.notes.forEach((noteName, i) => {
+              const pc = NOTE_NAMES.indexOf(noteName);
+              if (pc !== -1) {
+                simChroma[pc] = i === 0 ? 1.0 : 0.86;
+                // Subtle fifth harmonic overtone
+                const fifthPc = (pc + 7) % 12;
+                simChroma[fifthPc] = Math.max(simChroma[fifthPc], 0.34);
+              }
+            });
+
+            updateChordDisplay(simChroma, `SIM · ${preset.symbol.toUpperCase()}`);
+
+            if (state.simHoldTimeout) clearTimeout(state.simHoldTimeout);
+            state.simHoldTimeout = setTimeout(() => {
+              state.activePresetSymbol = null;
+              renderChordPresetChips();
+              if (!state.micActive) {
+                updateChordDisplay(new Array(12).fill(0), 'STANDBY');
+              }
+            }, 2600);
+          });
+
+          els.chordPresetsGrid.appendChild(btn);
+        });
+      }
+
+      // =======================================================================
+      // 8. LIVE MICROPHONE AUDIO LOOP (Web Audio API)
+      // =======================================================================
+      function startAnalysisLoop() {
+        if (!state.analyser || !state.audioCtx) return;
+
+        const timeBuffer = new Float32Array(state.analyser.fftSize);
+        const freqBuffer = new Float32Array(state.analyser.frequencyBinCount);
+
+        function tick() {
+          if (!state.micActive || !state.analyser) return;
+
+          if (state.activeTab === 'tuner') {
+            state.analyser.getFloatTimeDomainData(timeBuffer);
+            const pitch = detectPitchAutocorrelation(timeBuffer, state.audioCtx.sampleRate);
+            updateTunerDisplay(pitch);
+          } else {
+            // Do not overwrite active preset simulation while user is previewing a preset
+            if (!state.activePresetSymbol) {
+              state.analyser.getFloatFrequencyData(freqBuffer);
+              const chroma = computeChromaFromFFT(
+                freqBuffer,
+                state.audioCtx.sampleRate,
+                state.analyser.fftSize
+              );
+              updateChordDisplay(chroma, 'LIVE MIC');
+            }
+          }
+
+          state.rafId = requestAnimationFrame(tick);
+        }
+
+        state.rafId = requestAnimationFrame(tick);
+      }
+
+      async function toggleMicrophone() {
+        if (state.micActive) {
+          stopMicrophone();
+          return;
+        }
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showFeedback('Microphone access is not supported in this browser environment.', 'error');
+          return;
+        }
+
+        try {
+          hideFeedback();
+          const ctx = ensureAudioContext();
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+          });
+
+          const source = ctx.createMediaStreamSource(stream);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 8192;
+          analyser.smoothingTimeConstant = 0.78;
+          source.connect(analyser);
+
+          state.micStream = stream;
+          state.analyser = analyser;
+          state.micActive = true;
+
+          // Update Extended FAB & Status Badge to active recording state
+          els.micBtnLabel.textContent = 'Stop Mic';
+          els.micIconOff.classList.add('hidden');
+          els.micIconOn.classList.remove('hidden');
+          els.btnMicToggle.className = 'pointer-events-auto m3-ripple m3-fab-shadow flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#B3261E] hover:bg-[#9C1F18] dark:bg-[#F2B8B5] text-white dark:text-[#601410] text-sm font-semibold tracking-wide transition-all active:scale-[0.98] cursor-pointer';
+
+          els.audioStatusBadge.textContent = 'LIVE MIC';
+          els.audioStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995] text-[10px] font-semibold tracking-wide';
+
+          startAnalysisLoop();
+        } catch (err) {
+          console.error('Microphone error:', err);
+          showFeedback('Microphone permission denied or unavailable. Use the Chord Test Simulator or grant mic permissions.', 'error');
+        }
+      }
+
+      function stopMicrophone() {
+        state.micActive = false;
+        if (state.rafId) {
+          cancelAnimationFrame(state.rafId);
+          state.rafId = null;
+        }
+        if (state.micStream) {
+          state.micStream.getTracks().forEach((track) => track.stop());
+          state.micStream = null;
+        }
+        state.analyser = null;
+
+        // Restore Extended FAB & Status Badge
+        els.micBtnLabel.textContent = 'Start Mic';
+        els.micIconOff.classList.remove('hidden');
+        els.micIconOn.classList.add('hidden');
+        els.btnMicToggle.className = 'pointer-events-auto m3-ripple m3-fab-shadow flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-m3-primary hover:bg-m3-primaryHover dark:bg-m3-darkPrimary text-white dark:text-[#041E49] text-sm font-semibold tracking-wide transition-all active:scale-[0.98] cursor-pointer';
+
+        els.audioStatusBadge.textContent = 'STANDBY';
+        els.audioStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant text-[10px] font-semibold tracking-wide';
+
+        updateTunerDisplay(null);
+        if (!state.activePresetSymbol) {
+          updateChordDisplay(new Array(12).fill(0), 'STANDBY');
+        }
+      }
+
+      // =======================================================================
+      // 9. NAVIGATION & EVENT BINDINGS
+      // =======================================================================
+      function switchTab(tab) {
+        state.activeTab = tab;
+
+        if (tab === 'tuner') {
+          els.viewTuner.classList.remove('hidden');
+          els.viewChord.classList.add('hidden');
+          els.segmentPill.style.transform = 'translateX(0%)';
+
+          els.tabTuner.setAttribute('aria-selected', 'true');
+          els.tabChord.setAttribute('aria-selected', 'false');
+          els.tabTuner.className = 'relative z-10 py-2 px-3 rounded-full text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer cursor-pointer';
+          els.tabChord.className = 'relative z-10 py-2 px-3 rounded-full text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant cursor-pointer';
+
+          els.tabTunerCheck.classList.remove('hidden');
+          els.tabChordCheck.classList.add('hidden');
+        } else {
+          els.viewChord.classList.remove('hidden');
+          els.viewTuner.classList.add('hidden');
+          els.segmentPill.style.transform = 'translateX(100%)';
+
+          els.tabChord.setAttribute('aria-selected', 'true');
+          els.tabTuner.setAttribute('aria-selected', 'false');
+          els.tabChord.className = 'relative z-10 py-2 px-3 rounded-full text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer cursor-pointer';
+          els.tabTuner.className = 'relative z-10 py-2 px-3 rounded-full text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant cursor-pointer';
+
+          els.tabChordCheck.classList.remove('hidden');
+          els.tabTunerCheck.classList.add('hidden');
+          renderChromaSpectrum();
+        }
+      }
+
+      els.btnThemeToggle.addEventListener('click', () => applyTheme(!state.darkMode));
+      els.feedbackClose.addEventListener('click', hideFeedback);
+      els.tabTuner.addEventListener('click', () => switchTab('tuner'));
+      els.tabChord.addEventListener('click', () => switchTab('chord'));
+      els.btnMicToggle.addEventListener('click', toggleMicrophone);
+
+      els.btnAutoLock.addEventListener('click', () => {
+        state.autoStringLock = !state.autoStringLock;
+        updateAutoLockUI();
+      });
+
+      els.btnClearChord.addEventListener('click', () => {
+        if (state.simHoldTimeout) clearTimeout(state.simHoldTimeout);
+        state.activePresetSymbol = null;
+        renderChordPresetChips();
+        updateChordDisplay(new Array(12).fill(0), state.micActive ? 'LIVE MIC' : 'STANDBY');
+      });
+
+      // =======================================================================
+      // 10. INITIALIZE APPLICATION UI
+      // =======================================================================
+      applyTheme(false);
+      updateAutoLockUI();
+      renderStringChips();
+      updateTunerDisplay(null);
+      renderChordPresetChips();
+      updateChordDisplay(new Array(12).fill(0), 'STANDBY');
+    });
+  </script>
+</body>
+</html>
