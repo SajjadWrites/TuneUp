@@ -195,8 +195,8 @@
       <!-- ========================================================= -->
       <section id="view-tuner" class="space-y-4">
 
-        <!-- Elevated Material 3 Pitch Meter Card (24px border-radius) -->
-        <div id="tuner-gauge-card" class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-5 transition-all">
+        <!-- Elevated Material 3 Pitch Meter Card (Fixed width/height) -->
+        <div id="tuner-gauge-card" class="w-full h-[228px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-5 flex flex-col justify-between transition-all">
           <div class="flex items-start justify-between">
             <div>
               <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Target String</span>
@@ -216,7 +216,7 @@
           </div>
 
           <!-- Precision Linear Cents Meter (-50c to +50c) -->
-          <div class="my-5">
+          <div class="my-2">
             <div class="flex justify-between text-[10px] font-mono tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mb-1.5 px-1">
               <span class="text-[#E37400] dark:text-[#FBBF24] font-semibold">-50c FLAT</span>
               <span>-25c</span>
@@ -255,19 +255,19 @@
 
           <!-- Tune Status Verdict Pill & Concert Pitch -->
           <div class="flex items-center justify-between gap-2 pt-0.5">
-            <span id="tuner-verdict-pill" class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">
+            <span id="tuner-verdict-pill" class="px-3.5 py-1.5 rounded-full text-xs font-semibold truncate bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">
               Start mic &amp; pluck a string
             </span>
             <span class="text-[11px] font-mono tabular-nums text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant shrink-0">A4 = 440 Hz</span>
           </div>
         </div>
 
-        <!-- Material 3 String Selector Filter Chips Card (Auto + Standard EADGBE) -->
-        <div class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 space-y-3">
+        <!-- Material 3 String Selector Filter Chips Card (Fixed width/height) -->
+        <div class="w-full h-[204px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 flex flex-col justify-between">
           <div class="flex items-center justify-between gap-2">
-            <div>
+            <div class="min-w-0">
               <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">Standard Guitar Strings</h2>
-              <p id="tuner-mode-desc" class="text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Auto-detects nearest string · Tap chip for reference tone</p>
+              <p id="tuner-mode-desc" class="text-[11px] truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Auto-detects nearest string · Tap chip for reference tone</p>
             </div>
 
             <!-- Auto Detect Filter Chip -->
@@ -295,14 +295,14 @@
       <!-- ========================================================= -->
       <section id="view-chord" class="hidden space-y-4">
 
-        <!-- Elevated Material 3 Detected Chord Result Card (24px border-radius) -->
-        <div id="chord-result-card" class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-5 space-y-3.5">
-          <div class="flex items-start justify-between gap-2">
-            <div>
+        <!-- Elevated Material 3 Detected Chord Result Card (Fixed width & height) -->
+        <div id="chord-result-card" class="w-full h-[224px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-5 flex flex-col justify-between overflow-hidden">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="min-w-0 flex-1">
               <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Detected Chord</span>
-              <div class="flex flex-wrap items-center gap-2.5 mt-1">
-                <span id="chord-name-display" class="text-[36px] leading-none font-bold tracking-tight text-m3-onSurface dark:text-m3-darkOnSurface">Ready</span>
-                <span id="chord-quality-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer">
+              <div class="flex items-center gap-2 mt-1.5 h-10 overflow-hidden">
+                <span id="chord-name-display" class="text-[32px] leading-none font-bold tracking-tight truncate text-m3-onSurface dark:text-m3-darkOnSurface">Ready</span>
+                <span id="chord-quality-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer">
                   Standby
                 </span>
               </div>
@@ -310,32 +310,32 @@
 
             <div class="text-right shrink-0">
               <span class="text-[11px] font-medium uppercase tracking-wider text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Confidence</span>
-              <div class="mt-1">
+              <div class="mt-1.5 h-10 flex items-center justify-end">
                 <span id="chord-confidence-pct" class="inline-block px-2.5 py-0.5 rounded-full text-sm font-bold font-mono tabular-nums bg-[#CEEAD6]/70 dark:bg-[#188038]/25 text-[#188038] dark:text-[#81C995]">0%</span>
               </div>
             </div>
           </div>
 
           <!-- Material 3 Linear Progress Indicator -->
-          <div class="w-full h-2 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer overflow-hidden">
+          <div class="w-full h-2 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer overflow-hidden shrink-0">
             <div id="chord-confidence-bar" class="h-full w-0 bg-m3-primary dark:bg-m3-darkPrimary transition-all duration-200 rounded-full"></div>
           </div>
 
-          <!-- Active Constituent Notes Chips -->
-          <div>
+          <!-- Active Constituent Notes Chips (Fixed height prevents wrapping shifts) -->
+          <div class="shrink-0">
             <div class="flex items-center justify-between text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mb-2">
               <span class="font-medium uppercase tracking-wider">Constituent Notes</span>
-              <span id="chord-intervals-text" class="font-mono">Intervals: --</span>
+              <span id="chord-intervals-text" class="font-mono tabular-nums">Intervals: --</span>
             </div>
-            <div id="chord-active-notes" class="flex flex-wrap gap-1.5 min-h-[30px] items-center">
-              <span class="text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>
+            <div id="chord-active-notes" class="flex flex-nowrap overflow-x-auto no-scrollbar gap-1.5 h-[32px] items-center">
+              <span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>
             </div>
           </div>
         </div>
 
-        <!-- Material 3 Card: 12-Note Chroma Spectrum Visualizer -->
-        <div class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4">
-          <div class="flex items-center justify-between mb-2">
+        <!-- Material 3 Card: 12-Note Chroma Spectrum Visualizer (Fixed width & height) -->
+        <div class="w-full h-[156px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
             <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">12-Note Chroma Spectrum</h2>
             <span id="chord-source-label" class="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">STANDBY</span>
           </div>
@@ -344,12 +344,12 @@
           </div>
         </div>
 
-        <!-- Material 3 Card: Chord Preset / Test Simulator Chips -->
-        <div class="rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 space-y-3">
-          <div class="flex items-center justify-between">
-            <div>
+        <!-- Material 3 Card: Chord Preset / Test Simulator Chips (Fixed width & height) -->
+        <div class="w-full h-[180px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 flex flex-col justify-between">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
               <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">Chord Test Simulator</h2>
-              <p class="text-[11px] text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Tap a chord preset to synthesize guitar audio &amp; test detection</p>
+              <p class="text-[11px] truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Tap a chord preset to synthesize guitar audio &amp; test detection</p>
             </div>
             <button id="btn-clear-chord" type="button" class="m3-ripple text-xs font-semibold text-m3-primary dark:text-m3-darkPrimary hover:bg-m3-primaryContainer/50 dark:hover:bg-m3-darkPrimaryContainer/40 px-3 py-1.5 rounded-full transition cursor-pointer shrink-0">
               Reset
@@ -760,20 +760,20 @@
         if (!detectedFreq) {
           els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-m3-primary dark:bg-m3-darkPrimary border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
           els.tunerVerdictPill.textContent = state.micActive ? 'Listening — pluck a guitar string' : 'Start mic & pluck a string';
-          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant';
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold truncate bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant';
         } else if (absC <= 5) {
           els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-[#188038] dark:bg-[#81C995] border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
           els.tunerVerdictPill.textContent = `In Tune · ${target.label}`;
-          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]';
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold truncate bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]';
           els.tunerGaugeCard.classList.add('border-[#188038]', 'dark:border-[#81C995]', 'ring-2', 'ring-[#188038]/20', 'dark:ring-[#81C995]/20');
         } else if (cents < -5) {
           els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-[#E37400] dark:bg-[#FBBF24] border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
           els.tunerVerdictPill.textContent = `Flat (${roundedCents}c) · Tune Up`;
-          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#FEF7E0] text-[#B06000] dark:bg-[#E37400]/25 dark:text-[#FBBF24]';
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold truncate bg-[#FEF7E0] text-[#B06000] dark:bg-[#E37400]/25 dark:text-[#FBBF24]';
         } else {
           els.tunerNeedle.className = 'needle-transition absolute left-1/2 w-3.5 h-10 rounded-full bg-[#B3261E] dark:bg-[#F2B8B5] border-2 border-white dark:border-m3-darkSurface shadow-md z-10';
           els.tunerVerdictPill.textContent = `Sharp (+${roundedCents}c) · Tune Down`;
-          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#FCE8E6] text-[#B3261E] dark:bg-[#B3261E]/30 dark:text-[#F2B8B5]';
+          els.tunerVerdictPill.className = 'px-3.5 py-1.5 rounded-full text-xs font-semibold truncate bg-[#FCE8E6] text-[#B3261E] dark:bg-[#B3261E]/30 dark:text-[#F2B8B5]';
         }
       }
 
@@ -970,7 +970,7 @@
           els.chordConfidencePct.textContent = '0%';
           els.chordConfidenceBar.style.width = '0%';
           els.chordIntervalsText.textContent = 'Intervals: --';
-          els.chordActiveNotes.innerHTML = `<span class="text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>`;
+          els.chordActiveNotes.innerHTML = `<span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>`;
           renderChromaSpectrum([]);
           return;
         }
@@ -985,8 +985,8 @@
         result.chordNotes.forEach((n, index) => {
           const chip = document.createElement('span');
           chip.className = index === 0
-            ? 'px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
-            : 'px-3 py-1 rounded-full text-xs font-mono font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
+            ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
+            : 'px-3 py-1 rounded-full text-xs font-mono font-semibold whitespace-nowrap shrink-0 bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
           chip.textContent = index === 0 ? `${n} (Root)` : n;
           els.chordActiveNotes.appendChild(chip);
         });
@@ -1212,11 +1212,9 @@
     });
   </script>
   <script>
-    if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((err) => {
-          console.warn('Service worker registration skipped:', err);
-        });
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
   </script>
