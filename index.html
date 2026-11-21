@@ -328,7 +328,7 @@
               <span id="chord-intervals-text" class="font-mono tabular-nums">Intervals: --</span>
             </div>
             <div id="chord-active-notes" class="flex flex-nowrap overflow-x-auto no-scrollbar gap-1.5 h-[32px] items-center">
-              <span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>
+              <span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or select a chord below</span>
             </div>
           </div>
         </div>
@@ -344,19 +344,60 @@
           </div>
         </div>
 
-        <!-- Material 3 Card: Chord Preset / Test Simulator Chips (Fixed width & height) -->
-        <div class="w-full h-[180px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 flex flex-col justify-between">
+        <!-- Material 3 Card: Chord Family & Manual Selector (Fixed width & height) -->
+        <div class="w-full h-[226px] rounded-[24px] bg-m3-surface dark:bg-m3-darkSurface border border-m3-outline dark:border-m3-darkOutline m3-card-elevation p-4 flex flex-col justify-between">
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0">
-              <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">Chord Test Simulator</h2>
-              <p class="text-[11px] truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Tap a chord preset to synthesize guitar audio &amp; test detection</p>
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold text-m3-onSurface dark:text-m3-darkOnSurface">Chord Family</h2>
+                <span id="chord-family-key-badge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer truncate">
+                  Select or Play
+                </span>
+              </div>
+              <p class="text-[11px] truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant mt-0.5">Shows diatonic family of detected or chosen chord</p>
             </div>
             <button id="btn-clear-chord" type="button" class="m3-ripple text-xs font-semibold text-m3-primary dark:text-m3-darkPrimary hover:bg-m3-primaryContainer/50 dark:hover:bg-m3-darkPrimaryContainer/40 px-3 py-1.5 rounded-full transition cursor-pointer shrink-0">
               Reset
             </button>
           </div>
 
-          <div id="chord-presets-grid" class="grid grid-cols-4 gap-2">
+          <!-- Manual Chord Picker Row (Root Note + Quality + Preview Button) -->
+          <div class="grid grid-cols-12 gap-2 items-center">
+            <label for="manual-chord-root" class="sr-only">Chord Root Note</label>
+            <select
+              id="manual-chord-root"
+              aria-label="Select Chord Root Note"
+              class="col-span-4 h-9 px-2.5 rounded-xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow dark:bg-m3-darkContainerLow text-m3-onSurface dark:text-m3-darkOnSurface text-xs font-semibold focus:outline-none focus:border-m3-primary dark:focus:border-m3-darkPrimary cursor-pointer"
+            >
+              <!-- Populated cleanly via JS -->
+            </select>
+
+            <label for="manual-chord-quality" class="sr-only">Chord Type</label>
+            <select
+              id="manual-chord-quality"
+              aria-label="Select Chord Type"
+              class="col-span-5 h-9 px-2.5 rounded-xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow dark:bg-m3-darkContainerLow text-m3-onSurface dark:text-m3-darkOnSurface text-xs font-semibold focus:outline-none focus:border-m3-primary dark:focus:border-m3-darkPrimary cursor-pointer"
+            >
+              <option value="Major">Major</option>
+              <option value="m">Minor (m)</option>
+              <option value="7">Dominant 7th (7)</option>
+              <option value="maj7">Major 7th (maj7)</option>
+              <option value="m7">Minor 7th (m7)</option>
+              <option value="sus2">Suspended 2 (sus2)</option>
+              <option value="sus4">Suspended 4 (sus4)</option>
+            </select>
+
+            <button
+              id="btn-select-manual-chord"
+              type="button"
+              class="col-span-3 h-9 rounded-xl bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer text-xs font-semibold hover:opacity-90 transition cursor-pointer m3-ripple"
+            >
+              Show
+            </button>
+          </div>
+
+          <!-- 7 Diatonic Family Chords Grid (4 top + 3 bottom, fixed height) -->
+          <div id="chord-family-grid" class="grid grid-cols-4 gap-1.5 h-[84px]">
             <!-- Populated cleanly via JS -->
           </div>
         </div>
@@ -416,47 +457,25 @@
         { suffix: '',      displaySuffix: ' Major',quality: 'Major',       intervals: [0, 4, 7] },
       ];
 
-      const CHORD_PRESETS = [
-        {
-          symbol: 'C Maj',
-          notes: ['C', 'E', 'G'],
-          freqs: [130.81, 164.81, 196.00, 261.63, 329.63]
-        },
-        {
-          symbol: 'G Maj',
-          notes: ['G', 'B', 'D'],
-          freqs: [98.00, 123.47, 146.83, 196.00, 246.94, 392.00]
-        },
-        {
-          symbol: 'Am',
-          notes: ['A', 'C', 'E'],
-          freqs: [110.00, 164.81, 220.00, 261.63, 329.63]
-        },
-        {
-          symbol: 'F Maj',
-          notes: ['F', 'A', 'C'],
-          freqs: [87.31, 130.81, 174.61, 220.00, 261.63, 349.23]
-        },
-        {
-          symbol: 'D Maj',
-          notes: ['D', 'F#', 'A'],
-          freqs: [146.83, 220.00, 293.66, 369.99]
-        },
-        {
-          symbol: 'Em',
-          notes: ['E', 'G', 'B'],
-          freqs: [82.41, 123.47, 164.81, 196.00, 246.94, 329.63]
-        },
-        {
-          symbol: 'E7',
-          notes: ['E', 'G#', 'B', 'D'],
-          freqs: [82.41, 123.47, 146.83, 207.65, 246.94, 329.63]
-        },
-        {
-          symbol: 'Cmaj7',
-          notes: ['C', 'E', 'G', 'B'],
-          freqs: [130.81, 196.00, 246.94, 261.63, 329.63]
-        },
+      // Diatonic scale formulas for generating a chord's harmonic family
+      const MAJOR_SCALE_STEPS = [
+        { degree: 'I',    semitones: 0,  suffix: '',     intervals: [0, 4, 7] },
+        { degree: 'ii',   semitones: 2,  suffix: 'm',    intervals: [0, 3, 7] },
+        { degree: 'iii',  semitones: 4,  suffix: 'm',    intervals: [0, 3, 7] },
+        { degree: 'IV',   semitones: 5,  suffix: '',     intervals: [0, 4, 7] },
+        { degree: 'V',    semitones: 7,  suffix: '',     intervals: [0, 4, 7] },
+        { degree: 'vi',   semitones: 9,  suffix: 'm',    intervals: [0, 3, 7] },
+        { degree: 'vii°', semitones: 11, suffix: 'dim',  intervals: [0, 3, 6] },
+      ];
+
+      const MINOR_SCALE_STEPS = [
+        { degree: 'i',    semitones: 0,  suffix: 'm',    intervals: [0, 3, 7] },
+        { degree: 'ii°',  semitones: 2,  suffix: 'dim',  intervals: [0, 3, 6] },
+        { degree: 'III',  semitones: 3,  suffix: '',     intervals: [0, 4, 7] },
+        { degree: 'iv',   semitones: 5,  suffix: 'm',    intervals: [0, 3, 7] },
+        { degree: 'v',    semitones: 7,  suffix: 'm',    intervals: [0, 3, 7] },
+        { degree: 'VI',   semitones: 8,  suffix: '',     intervals: [0, 4, 7] },
+        { degree: 'VII',  semitones: 10, suffix: '',     intervals: [0, 4, 7] },
       ];
 
       // =======================================================================
@@ -481,8 +500,8 @@
         candidateChordSince: 0,
         displayedChord: null,
         lastChordConfirmTime: 0,
-        activePresetSymbol: null,
-        simHoldTimeout: null,
+        manualChordActive: false,
+        selectedManualSymbol: null,
         audioCtx: null,
         analyser: null,
         micStream: null,
@@ -533,7 +552,11 @@
         chordActiveNotes: document.getElementById('chord-active-notes'),
         chordSourceLabel: document.getElementById('chord-source-label'),
         chromaBarsContainer: document.getElementById('chroma-bars-container'),
-        chordPresetsGrid: document.getElementById('chord-presets-grid'),
+        chordFamilyKeyBadge: document.getElementById('chord-family-key-badge'),
+        manualChordRoot: document.getElementById('manual-chord-root'),
+        manualChordQuality: document.getElementById('manual-chord-quality'),
+        btnSelectManualChord: document.getElementById('btn-select-manual-chord'),
+        chordFamilyGrid: document.getElementById('chord-family-grid'),
         btnClearChord: document.getElementById('btn-clear-chord'),
       };
 
@@ -1065,8 +1088,9 @@
           els.chordConfidencePct.textContent = '0%';
           els.chordConfidenceBar.style.width = '0%';
           els.chordIntervalsText.textContent = 'Intervals: --';
-          els.chordActiveNotes.innerHTML = `<span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or tap a chord preset below</span>`;
+          els.chordActiveNotes.innerHTML = `<span class="text-xs truncate text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant">Strum a chord on mic or select a chord below</span>`;
           renderChromaSpectrum([]);
+          renderChordFamily(null, null);
           return;
         }
 
@@ -1087,49 +1111,178 @@
         });
 
         renderChromaSpectrum(resultToShow.chordNotes);
+        renderChordFamily(resultToShow.rootName, resultToShow.quality, resultToShow.displayName);
       }
 
-      function renderChordPresetChips() {
-        els.chordPresetsGrid.innerHTML = '';
-        CHORD_PRESETS.forEach((preset) => {
-          const isActive = state.activePresetSymbol === preset.symbol;
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = isActive
-            ? 'm3-ripple py-2.5 px-2 rounded-2xl border border-m3-primary dark:border-m3-darkPrimary bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer text-xs font-semibold transition cursor-pointer text-center'
-            : 'm3-ripple py-2.5 px-2 rounded-2xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow/70 dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurface dark:text-m3-darkOnSurface text-xs font-semibold transition cursor-pointer text-center';
-          btn.textContent = preset.symbol;
+      function getChordFamilyData(rootName, quality) {
+        const rootIdx = NOTE_NAMES.indexOf(rootName);
+        if (rootIdx === -1) return null;
 
-          btn.addEventListener('click', () => {
-            state.activePresetSymbol = preset.symbol;
-            renderChordPresetChips();
-            playStrummedChord(preset.freqs);
+        const isMinorFamily = quality === 'Minor' || quality === 'Minor 7th';
+        const scaleSteps = isMinorFamily ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+        const familyTitle = isMinorFamily ? `${rootName} Minor Family` : `${rootName} Major Family`;
 
-            // Build realistic harmonic chroma vector from preset chord notes
-            const simChroma = new Array(12).fill(0.04);
-            preset.notes.forEach((noteName, i) => {
-              const pc = NOTE_NAMES.indexOf(noteName);
-              if (pc !== -1) {
-                simChroma[pc] = i === 0 ? 1.0 : 0.86;
-                // Subtle fifth harmonic overtone
-                const fifthPc = (pc + 7) % 12;
-                simChroma[fifthPc] = Math.max(simChroma[fifthPc], 0.34);
-              }
-            });
-
-            updateChordDisplay(simChroma, `SIM · ${preset.symbol.toUpperCase()}`, true);
-
-            if (state.simHoldTimeout) clearTimeout(state.simHoldTimeout);
-            state.simHoldTimeout = setTimeout(() => {
-              state.activePresetSymbol = null;
-              renderChordPresetChips();
-              if (!state.micActive) {
-                updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
-              }
-            }, 2600);
+        const members = scaleSteps.map((step) => {
+          const chordRootIdx = (rootIdx + step.semitones) % 12;
+          const chordRootName = NOTE_NAMES[chordRootIdx];
+          const shortSymbol = `${chordRootName}${step.suffix}`;
+          const fullDisplay = step.suffix === '' ? `${chordRootName} Major` : shortSymbol;
+          const notes = step.intervals.map((iv) => NOTE_NAMES[(chordRootIdx + iv) % 12]);
+          const freqs = step.intervals.map((iv) => {
+            const midi = 48 + chordRootIdx + iv; // C3 octave base
+            return 440 * Math.pow(2, (midi - 69) / 12);
           });
 
-          els.chordPresetsGrid.appendChild(btn);
+          return {
+            degree: step.degree,
+            shortSymbol,
+            fullDisplay,
+            rootName: chordRootName,
+            suffix: step.suffix,
+            intervals: step.intervals,
+            notes,
+            freqs,
+          };
+        });
+
+        return { familyTitle, members };
+      }
+
+      function selectManualChord(rootName, qualityKey, playSound = true) {
+        const rootIdx = NOTE_NAMES.indexOf(rootName);
+        if (rootIdx === -1) return;
+
+        // Map dropdown value or family suffix to template
+        const normalizedKey = qualityKey === 'Major' ? '' : qualityKey;
+        const tmpl = CHORD_TEMPLATES.find((t) => t.suffix === normalizedKey) || {
+          suffix: normalizedKey,
+          displaySuffix: normalizedKey === 'dim' ? 'dim' : normalizedKey,
+          quality: normalizedKey === 'dim' ? 'Diminished' : 'Major',
+          intervals: normalizedKey === 'dim' ? [0, 3, 6] : [0, 4, 7],
+        };
+
+        const displayName = `${rootName}${tmpl.displaySuffix}`;
+        const chordNotes = tmpl.intervals.map((iv) => NOTE_NAMES[(rootIdx + iv) % 12]);
+        const freqs = tmpl.intervals.map((iv) => {
+          const midi = 48 + rootIdx + iv;
+          return 440 * Math.pow(2, (midi - 69) / 12);
+        });
+
+        state.manualChordActive = true;
+        state.selectedManualSymbol = displayName;
+
+        // Sync dropdown controls
+        els.manualChordRoot.value = rootName;
+        if (Array.from(els.manualChordQuality.options).some((opt) => opt.value === qualityKey)) {
+          els.manualChordQuality.value = qualityKey;
+        }
+
+        if (playSound) {
+          playStrummedChord(freqs);
+        }
+
+        // Build chroma vector for visual consistency
+        const simChroma = new Array(12).fill(0.04);
+        chordNotes.forEach((noteName, i) => {
+          const pc = NOTE_NAMES.indexOf(noteName);
+          if (pc !== -1) {
+            simChroma[pc] = i === 0 ? 1.0 : 0.86;
+          }
+        });
+
+        state.chromaEnergies = simChroma;
+        els.chordSourceLabel.textContent = 'MANUAL';
+        els.chordNameDisplay.textContent = displayName;
+        els.chordQualityBadge.textContent = tmpl.quality;
+        els.chordConfidencePct.textContent = '100%';
+        els.chordConfidenceBar.style.width = '100%';
+        els.chordIntervalsText.textContent = `Intervals: [${tmpl.intervals.join('-')}]`;
+
+        els.chordActiveNotes.innerHTML = '';
+        chordNotes.forEach((n, index) => {
+          const chip = document.createElement('span');
+          chip.className = index === 0
+            ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
+            : 'px-3 py-1 rounded-full text-xs font-mono font-semibold whitespace-nowrap shrink-0 bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
+          chip.textContent = index === 0 ? `${n} (Root)` : n;
+          els.chordActiveNotes.appendChild(chip);
+        });
+
+        renderChromaSpectrum(chordNotes);
+        renderChordFamily(rootName, tmpl.quality, displayName);
+      }
+
+      function renderChordFamily(rootName, quality, activeChordDisplay = null) {
+        els.chordFamilyGrid.innerHTML = '';
+
+        if (!rootName) {
+          els.chordFamilyKeyBadge.textContent = 'Select or Play';
+          const emptyMsg = document.createElement('div');
+          emptyMsg.className = 'col-span-4 h-full rounded-2xl bg-m3-containerLow/60 dark:bg-m3-darkContainerLow flex items-center justify-center text-xs text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant px-3 text-center';
+          emptyMsg.textContent = 'Play a chord on mic or pick a root & type above to view its 7-chord family';
+          els.chordFamilyGrid.appendChild(emptyMsg);
+          return;
+        }
+
+        const familyData = getChordFamilyData(rootName, quality);
+        if (!familyData) return;
+
+        els.chordFamilyKeyBadge.textContent = familyData.familyTitle;
+
+        familyData.members.forEach((member) => {
+          const isCurrent = activeChordDisplay === member.fullDisplay || activeChordDisplay === member.shortSymbol;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = isCurrent
+            ? 'm3-ripple px-1.5 py-1 rounded-xl border border-[#188038] dark:border-[#81C995] bg-[#CEEAD6]/80 dark:bg-[#188038]/30 text-[#0D652D] dark:text-[#81C995] flex flex-col items-center justify-center transition cursor-pointer'
+            : 'm3-ripple px-1.5 py-1 rounded-xl border border-m3-outline dark:border-m3-darkOutline bg-m3-containerLow/70 dark:bg-m3-darkContainerLow hover:bg-m3-container dark:hover:bg-m3-darkContainer text-m3-onSurface dark:text-m3-darkOnSurface flex flex-col items-center justify-center transition cursor-pointer';
+
+          btn.innerHTML = `
+            <span class="text-[9px] font-mono opacity-75 leading-none">${member.degree}</span>
+            <span class="text-xs font-bold leading-tight mt-0.5 truncate max-w-full">${member.shortSymbol}</span>
+          `;
+
+          btn.addEventListener('click', () => {
+            playStrummedChord(member.freqs);
+            // Keep the current family visible while previewing any member chord
+            els.chordSourceLabel.textContent = 'FAMILY';
+            els.chordNameDisplay.textContent = member.fullDisplay;
+            els.chordQualityBadge.textContent = member.suffix === 'm' ? 'Minor' : member.suffix === 'dim' ? 'Diminished' : 'Major';
+            els.chordConfidencePct.textContent = '100%';
+            els.chordConfidenceBar.style.width = '100%';
+            els.chordIntervalsText.textContent = `Degree: ${member.degree}`;
+
+            els.chordActiveNotes.innerHTML = '';
+            member.notes.forEach((n, index) => {
+              const chip = document.createElement('span');
+              chip.className = index === 0
+                ? 'px-3 py-1 rounded-full text-xs font-mono font-bold whitespace-nowrap shrink-0 bg-[#CEEAD6] text-[#0D652D] dark:bg-[#188038]/30 dark:text-[#81C995]'
+                : 'px-3 py-1 rounded-full text-xs font-mono font-semibold whitespace-nowrap shrink-0 bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkOnPrimaryContainer';
+              chip.textContent = index === 0 ? `${n} (Root)` : n;
+              els.chordActiveNotes.appendChild(chip);
+            });
+
+            const simChroma = new Array(12).fill(0.04);
+            member.notes.forEach((noteName, i) => {
+              const pc = NOTE_NAMES.indexOf(noteName);
+              if (pc !== -1) simChroma[pc] = i === 0 ? 1.0 : 0.86;
+            });
+            state.chromaEnergies = simChroma;
+            renderChromaSpectrum(member.notes);
+            renderChordFamily(rootName, quality, member.fullDisplay);
+          });
+
+          els.chordFamilyGrid.appendChild(btn);
+        });
+      }
+
+      function populateManualChordRoots() {
+        els.manualChordRoot.innerHTML = '';
+        NOTE_NAMES.forEach((note) => {
+          const opt = document.createElement('option');
+          opt.value = note;
+          opt.textContent = note;
+          els.manualChordRoot.appendChild(opt);
         });
       }
 
@@ -1150,8 +1303,8 @@
             const pitch = detectPitchAutocorrelation(timeBuffer, state.audioCtx.sampleRate);
             updateTunerDisplay(pitch);
           } else {
-            // Do not overwrite active preset simulation while user is previewing a preset
-            if (!state.activePresetSymbol) {
+            // Do not overwrite manual selection while user is inspecting a chosen chord
+            if (!state.manualChordActive) {
               state.analyser.getFloatFrequencyData(freqBuffer);
               const chroma = computeChromaFromFFT(
                 freqBuffer,
@@ -1200,6 +1353,11 @@
           state.analyser = analyser;
           state.micActive = true;
 
+          // Clear any manually selected chord so live listening starts immediately
+          state.manualChordActive = false;
+          state.selectedManualSymbol = null;
+          updateChordDisplay(new Array(12).fill(0), 'LIVE MIC', true);
+
           // Update Extended FAB & Status Badge to active recording state
           els.micBtnLabel.textContent = 'Stop Mic';
           els.micIconOff.classList.add('hidden');
@@ -1212,7 +1370,7 @@
           startAnalysisLoop();
         } catch (err) {
           console.error('Microphone error:', err);
-          showFeedback('Microphone permission denied or unavailable. Use the Chord Test Simulator or grant mic permissions.', 'error');
+          showFeedback('Microphone permission denied or unavailable. Select a chord manually or grant mic permissions.', 'error');
         }
       }
 
@@ -1238,7 +1396,7 @@
         els.audioStatusBadge.className = 'px-2.5 py-0.5 rounded-full bg-m3-containerLow dark:bg-m3-darkContainer text-m3-onSurfaceVariant dark:text-m3-darkOnSurfaceVariant text-[10px] font-semibold tracking-wide';
 
         updateTunerDisplay(null, true);
-        if (!state.activePresetSymbol) {
+        if (!state.manualChordActive) {
           updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
         }
       }
@@ -1288,10 +1446,13 @@
         updateAutoLockUI();
       });
 
+      els.btnSelectManualChord.addEventListener('click', () => {
+        selectManualChord(els.manualChordRoot.value, els.manualChordQuality.value, true);
+      });
+
       els.btnClearChord.addEventListener('click', () => {
-        if (state.simHoldTimeout) clearTimeout(state.simHoldTimeout);
-        state.activePresetSymbol = null;
-        renderChordPresetChips();
+        state.manualChordActive = false;
+        state.selectedManualSymbol = null;
         updateChordDisplay(new Array(12).fill(0), state.micActive ? 'LIVE MIC' : 'STANDBY', true);
       });
 
@@ -1302,7 +1463,7 @@
       updateAutoLockUI();
       renderStringChips();
       updateTunerDisplay(null, true);
-      renderChordPresetChips();
+      populateManualChordRoots();
       updateChordDisplay(new Array(12).fill(0), 'STANDBY', true);
     });
   </script>
