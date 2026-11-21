@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#D3E3FD">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TuneUp — Guitar Tuner &amp; Chord Detector</title>
@@ -1209,5 +1211,12 @@
       updateChordDisplay(new Array(12).fill(0), 'STANDBY');
     });
   </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js');
+    });
+  }
+</script>
 </body>
 </html>
